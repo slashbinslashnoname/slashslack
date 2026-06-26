@@ -12,6 +12,7 @@ import {
 } from "../auth.js";
 import { issueSocketToken } from "../realtime/tokens.js";
 import { addUserToAllPublicChannels } from "../services/channels.js";
+import { isBlocked } from "../services/bans.js";
 
 // stricter limit on credential endpoints to slow brute-force attempts
 const authLimit = {
@@ -27,12 +28,19 @@ export async function authRoutes(app: FastifyInstance) {
     const settings = getSettings();
     const userCount = db.select().from(users).all().length;
     const { email, password, displayName, inviteToken } = parsed.data;
+    const ip = req.ip;
+    const device = (req as any).deviceId ?? null;
+
+    // banned email / IP / device may not create accounts
+    if (userCount > 0 && isBlocked({ email, ip, device }))
+      return reply.code(403).send({ error: "Registration is not allowed." });
 
     // validate an invite if one was supplied
-    let invite = inviteToken
+    const invite = inviteToken
       ? db.select().from(invites).where(eq(invites.token, inviteToken)).get()
       : null;
     const validInvite = invite && !invite.acceptedAt;
+    const genericInvite = validInvite && (!invite!.email || invite!.email === "");
 
     // gate registration: first user is always allowed (becomes admin);
     // afterwards, open registration OR a valid invite is required.
@@ -41,7 +49,8 @@ export async function authRoutes(app: FastifyInstance) {
         .code(403)
         .send({ error: "Registration is invite-only. Ask an admin for an invitation." });
     }
-    if (validInvite && invite!.email.toLowerCase() !== email.toLowerCase()) {
+    // email-specific invites must match; generic links let the user pick any email
+    if (validInvite && !genericInvite && invite!.email.toLowerCase() !== email.toLowerCase()) {
       return reply.code(400).send({ error: "This invite is for a different email address." });
     }
 
@@ -52,10 +61,12 @@ export async function authRoutes(app: FastifyInstance) {
     const role = userCount === 0 ? "admin" : "member"; // first user is admin
     const user = db
       .insert(users)
-      .values({ email, passwordHash, displayName, role })
+      .values({ email, passwordHash, displayName, role, lastIp: ip, lastDevice: device })
       .returning()
       .get();
 
+    if (validInvite)
+      db.update(invites).set({ acceptedAt: new Date().toISOString() }).where(eq(invites.id, invite!.id)).run();
     addUserToAllPublicChannels(user.id);
     req.session.set("userId", user.id);
     return { user: toPublicUser(user) };
@@ -65,9 +76,14 @@ export async function authRoutes(app: FastifyInstance) {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "Invalid input" });
     const { email, password } = parsed.data;
+    const ip = req.ip;
+    const device = (req as any).deviceId ?? null;
+    if (isBlocked({ email, ip, device }))
+      return reply.code(403).send({ error: "Access denied." });
     const user = db.select().from(users).where(eq(users.email, email)).get();
-    if (!user || user.isBot || !(await verifyPassword(user.passwordHash, password)))
+    if (!user || user.isBot || user.banned || !(await verifyPassword(user.passwordHash, password)))
       return reply.code(401).send({ error: "Invalid email or password" });
+    db.update(users).set({ lastIp: ip, lastDevice: device }).where(eq(users.id, user.id)).run();
     req.session.set("userId", user.id);
     return { user: toPublicUser(user) };
   });

@@ -15,6 +15,21 @@ export const users = sqliteTable("users", {
   role: text("role").notNull().default("member"),
   statusText: text("status_text"),
   isBot: integer("is_bot", { mode: "boolean" }).notNull().default(false),
+  banned: integer("banned", { mode: "boolean" }).notNull().default(false),
+  lastIp: text("last_ip"),
+  lastDevice: text("last_device"),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
+export const bans = sqliteTable("bans", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id"),
+  email: text("email"),
+  ip: text("ip"),
+  device: text("device"),
+  reason: text("reason"),
   createdAt: text("created_at")
     .notNull()
     .default(sql`(datetime('now'))`),

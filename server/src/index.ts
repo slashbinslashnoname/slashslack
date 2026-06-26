@@ -8,6 +8,8 @@ import rateLimit from "@fastify/rate-limit";
 import helmet from "@fastify/helmet";
 import secureSession from "@fastify/secure-session";
 import crypto from "node:crypto";
+import { nanoid } from "nanoid";
+import { getCookie } from "./lib/cookies.js";
 import { seed, UPLOAD_DIR } from "./db/index.js";
 import { initRealtime } from "./realtime/index.js";
 import { authRoutes } from "./routes/auth.js";
@@ -23,6 +25,7 @@ import { extraRoutes } from "./routes/extras.js";
 import { inviteRoutes } from "./routes/invites.js";
 import { nasaRoutes } from "./routes/nasa.js";
 import { webhookRoutes } from "./routes/webhooks.js";
+import { adminRoutes } from "./routes/admin.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
@@ -47,7 +50,24 @@ function sessionKey(): Buffer {
 async function main() {
   seed();
 
-  const app = Fastify({ logger: { level: process.env.LOG_LEVEL || "info" }, bodyLimit: 30 * 1024 * 1024 });
+  const app = Fastify({
+    logger: { level: process.env.LOG_LEVEL || "info" },
+    bodyLimit: 30 * 1024 * 1024,
+    trustProxy: true, // honour X-Forwarded-For so req.ip is the real client behind a proxy
+  });
+
+  // assign a stable device id cookie (used for cookie-based bans)
+  app.addHook("onRequest", async (req, reply) => {
+    let device = getCookie(req, "ss_device");
+    if (!device) {
+      device = nanoid(24);
+      reply.header(
+        "set-cookie",
+        `ss_device=${device}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${HTTPS_ORIGIN ? "; Secure" : ""}`,
+      );
+    }
+    (req as any).deviceId = device;
+  });
 
   // security headers (CSP tuned for the SPA: external images/media allowed,
   // no inline/external scripts, no framing)
@@ -123,6 +143,7 @@ async function main() {
   await app.register(inviteRoutes);
   await app.register(nasaRoutes);
   await app.register(webhookRoutes);
+  await app.register(adminRoutes);
 
   // serve the built client (single-container deployment) with SPA fallback
   const clientDist = path.resolve(__dirname, "../../client/dist");

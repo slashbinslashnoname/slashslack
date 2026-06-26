@@ -56,6 +56,16 @@ export async function requireAuth(req: FastifyRequest, reply: FastifyReply) {
     req.session.delete();
     return reply.code(401).send({ error: "Not authenticated" });
   }
+  if (user.banned) {
+    req.session.delete();
+    return reply.code(403).send({ error: "Your account has been banned" });
+  }
+  // track last IP / device for moderation (used when banning)
+  const ip = req.ip;
+  const device = (req as any).deviceId ?? null;
+  if (ip !== user.lastIp || device !== user.lastDevice) {
+    db.update(users).set({ lastIp: ip, lastDevice: device }).where(eq(users.id, user.id)).run();
+  }
   (req as any).user = user;
 }
 

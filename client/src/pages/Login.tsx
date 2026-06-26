@@ -21,6 +21,7 @@ export function Login() {
   const [busy, setBusy] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [invited, setInvited] = useState(false);
+  const [emailLocked, setEmailLocked] = useState(false);
 
   useEffect(() => {
     const token = new URLSearchParams(location.search).get("invite");
@@ -30,9 +31,13 @@ export function Login() {
       .then((r) => {
         setInviteToken(token);
         setInvited(true);
-        setEmail(r.email);
         setMode("register");
         setShowForm(true);
+        // email-specific invite prefills + locks the email; generic links let the user pick
+        if (r.email) {
+          setEmail(r.email);
+          setEmailLocked(true);
+        }
       })
       .catch(() => {
         setError("This invitation link is invalid or has already been used.");
@@ -134,7 +139,8 @@ export function Login() {
 
           {invited && (
             <div className="mb-4 text-sm rounded-theme p-3" style={{ background: "color-mix(in srgb, var(--accent) 12%, transparent)" }}>
-              You've been invited to join <strong>{appName}</strong>. Set a password to continue.
+              You've been invited to join <strong>{appName}</strong>.{" "}
+              {emailLocked ? "Set a password to continue." : "Enter your email and a password to join."}
             </div>
           )}
 
@@ -153,7 +159,7 @@ export function Login() {
               type="email"
               placeholder="Email"
               value={email}
-              readOnly={invited}
+              readOnly={emailLocked}
               onChange={(e) => setEmail(e.target.value)}
               className="border border-border rounded-theme px-3 py-2 bg-elev read-only:opacity-70"
             />

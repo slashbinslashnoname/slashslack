@@ -22,11 +22,13 @@ export async function inviteRoutes(app: FastifyInstance) {
   app.post("/api/invites", { preHandler: requireAdmin }, async (req, reply) => {
     const parsed = createInviteSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "Invalid email" });
-    const email = parsed.data.email.toLowerCase();
     const user = currentUser(req);
+    const email = parsed.data.email ? parsed.data.email.toLowerCase() : ""; // "" = generic link
 
-    const existingUser = db.select().from(users).where(eq(users.email, email)).get();
-    if (existingUser) return reply.code(409).send({ error: "That email already has an account" });
+    if (email) {
+      const existingUser = db.select().from(users).where(eq(users.email, email)).get();
+      if (existingUser) return reply.code(409).send({ error: "That email already has an account" });
+    }
 
     const token = nanoid(24);
     const row = db
@@ -36,14 +38,21 @@ export async function inviteRoutes(app: FastifyInstance) {
       .get();
 
     const url = inviteUrl(req, token);
-    const settings = getSettings();
-    const { text, html } = inviteEmail(settings.appName, user.displayName, url);
-    const result = await sendMail({
-      to: email,
-      subject: `You're invited to ${settings.appName}`,
-      text,
-      html,
-    });
+    // only email-specific invites are emailed; generic links are shared manually
+    let emailed = false;
+    let emailError: string | null = null;
+    if (email) {
+      const settings = getSettings();
+      const { text, html } = inviteEmail(settings.appName, user.displayName, url);
+      const result = await sendMail({
+        to: email,
+        subject: `You're invited to ${settings.appName}`,
+        text,
+        html,
+      });
+      emailed = result.sent;
+      emailError = result.error ?? null;
+    }
 
     const invite: Invite = {
       id: row.id,
@@ -53,7 +62,7 @@ export async function inviteRoutes(app: FastifyInstance) {
       createdAt: row.createdAt,
       inviteUrl: url,
     };
-    return { invite, emailed: result.sent, emailError: result.error ?? null };
+    return { invite, emailed, emailError };
   });
 
   // list pending/sent invites (admin)

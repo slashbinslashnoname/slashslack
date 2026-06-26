@@ -221,4 +221,26 @@ export const MIGRATIONS: Migration[] = [
       addColumn(db, "channel_webhooks", "bot_user_id", "INTEGER");
     },
   },
+  {
+    id: "0008_bans",
+    up: (db) => {
+      addColumn(db, "users", "banned", "INTEGER NOT NULL DEFAULT 0");
+      addColumn(db, "users", "last_ip", "TEXT");
+      addColumn(db, "users", "last_device", "TEXT");
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS bans (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER,
+          email TEXT,
+          ip TEXT,
+          device TEXT,
+          reason TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_bans_email ON bans(email);
+        CREATE INDEX IF NOT EXISTS idx_bans_ip ON bans(ip);
+        CREATE INDEX IF NOT EXISTS idx_bans_device ON bans(device);
+      `);
+    },
+  },
 ];

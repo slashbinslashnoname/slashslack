@@ -11,7 +11,8 @@ export const registerSchema = z.object({
 export type RegisterInput = z.infer<typeof registerSchema>;
 
 export const createInviteSchema = z.object({
-  email: z.string().email(),
+  // omit email to generate a generic link where the user picks their own email
+  email: z.string().email().optional(),
 });
 export type CreateInviteInput = z.infer<typeof createInviteSchema>;
 

@@ -2,14 +2,14 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import type { AppSettings, Category, Channel, Invite, PublicUser } from "@slashslack/shared";
-import { ArrowLeft, Star, Trash2, Plus, Upload, Copy, Mail } from "lucide-react";
+import { ArrowLeft, Star, Trash2, Plus, Upload, Copy, Mail, Link2, Ban, ShieldCheck } from "lucide-react";
 import { api } from "../lib/api";
 import { applyThemeTokens } from "../lib/theme";
 import { IconPicker } from "../components/IconPicker";
 import { SortableList } from "../components/Sortable";
 import { useCategories, useChannels, useSettings } from "../lib/queries";
 
-const TABS = ["Branding", "Theme", "Channels", "Access"] as const;
+const TABS = ["Branding", "Theme", "Channels", "Access", "Members"] as const;
 
 export function Admin({ me }: { me: PublicUser }) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Branding");
@@ -41,6 +41,7 @@ export function Admin({ me }: { me: PublicUser }) {
         {tab === "Theme" && <Theme />}
         {tab === "Channels" && <Channels />}
         {tab === "Access" && <Access />}
+        {tab === "Members" && <Members me={me} />}
       </div>
     </div>
   );
@@ -116,6 +117,75 @@ function SmtpSettings() {
       <button onClick={save} className="bg-accent text-accent-fg px-4 py-2 rounded-theme mt-3">
         {saved ? "Saved!" : "Save SMTP settings"}
       </button>
+    </Field>
+  );
+}
+
+interface AdminUser {
+  id: number;
+  email: string;
+  displayName: string;
+  role: string;
+  banned: boolean;
+  lastIp: string | null;
+}
+
+function Members({ me }: { me: PublicUser }) {
+  const qc = useQueryClient();
+  const { data: usersList = [] } = useQuery({
+    queryKey: ["admin-users"],
+    queryFn: () => api.get<{ users: AdminUser[] }>("/api/admin/users").then((r) => r.users),
+  });
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["admin-users"] });
+    qc.invalidateQueries({ queryKey: ["users"] });
+  };
+  const ban = async (u: AdminUser) => {
+    const reason = prompt(`Ban ${u.displayName}? This blocks their email, IP, and device.\n\nOptional reason:`);
+    if (reason === null) return;
+    await api.post(`/api/admin/users/${u.id}/ban`, { reason });
+    refresh();
+  };
+  const unban = async (u: AdminUser) => {
+    await api.post(`/api/admin/users/${u.id}/unban`);
+    refresh();
+  };
+
+  return (
+    <Field label="Members">
+      <p className="text-xs text-muted mb-3">
+        Banning a user blocks their <strong>email</strong>, <strong>IP address</strong>, and{" "}
+        <strong>device cookie</strong> from logging in or registering, and ends their sessions.
+      </p>
+      <div className="flex flex-col">
+        {usersList.map((u) => (
+          <div key={u.id} className="flex items-center gap-3 py-2 border-b border-border/50">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-medium truncate">{u.displayName}</span>
+                {u.role === "admin" && <span className="text-[10px] uppercase bg-accent text-accent-fg rounded px-1">admin</span>}
+                {u.banned && <span className="text-[10px] uppercase bg-danger text-white rounded px-1">banned</span>}
+              </div>
+              <div className="text-xs text-muted truncate">
+                {u.email}
+                {u.lastIp && <span className="ml-2">· {u.lastIp}</span>}
+              </div>
+            </div>
+            {u.id !== me.id && u.role !== "admin" && (
+              u.banned ? (
+                <button onClick={() => unban(u)} className="flex items-center gap-1 text-sm text-success hover:underline">
+                  <ShieldCheck size={15} /> Unban
+                </button>
+              ) : (
+                <button onClick={() => ban(u)} className="flex items-center gap-1 text-sm text-danger hover:underline">
+                  <Ban size={15} /> Ban
+                </button>
+              )
+            )}
+          </div>
+        ))}
+      </div>
     </Field>
   );
 }
@@ -373,6 +443,18 @@ function Access() {
     }
   };
 
+  const generateLink = async () => {
+    setNotice(null);
+    try {
+      const r = await api.post<{ invite: Invite }>("/api/invites", {}); // no email = generic link
+      await navigator.clipboard.writeText(r.invite.inviteUrl).catch(() => {});
+      qc.invalidateQueries({ queryKey: ["invites"] });
+      setNotice("Invite link generated and copied — the recipient sets their own email & password.");
+    } catch (e: any) {
+      setNotice(e?.message || "Failed to generate link");
+    }
+  };
+
   const revoke = async (id: number) => {
     await api.del(`/api/invites/${id}`);
     qc.invalidateQueries({ queryKey: ["invites"] });
@@ -428,6 +510,9 @@ function Access() {
             <Mail size={16} /> Invite
           </button>
         </div>
+        <button onClick={generateLink} className="mt-2 text-sm text-accent hover:underline flex items-center gap-1">
+          <Link2 size={14} /> Or generate a shareable invite link (recipient picks their own email)
+        </button>
         {notice && <div className="text-sm mt-2 text-success">{notice}</div>}
       </Field>
 
@@ -436,7 +521,9 @@ function Access() {
           {(!data || data.invites.length === 0) && <div className="text-muted text-sm">No invites yet.</div>}
           {data?.invites.map((inv) => (
             <div key={inv.id} className="flex items-center gap-2 py-1.5 border-b border-border/50">
-              <span className="flex-1 truncate">{inv.email}</span>
+              <span className="flex-1 truncate">
+                {inv.email || <span className="text-muted italic">Anyone with the link</span>}
+              </span>
               <span className="text-xs text-muted">{inv.acceptedAt ? "joined" : "pending"}</span>
               {!inv.acceptedAt && (
                 <button onClick={() => navigator.clipboard.writeText(inv.inviteUrl)} title="Copy invite link" className="text-muted hover:text-accent">

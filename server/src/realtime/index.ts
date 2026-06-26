@@ -114,6 +114,13 @@ export function joinAllToChannel(channelId: number) {
   io?.sockets.sockets.forEach((s) => s.join(`channel:${channelId}`));
 }
 
+/** Forcibly disconnect all of a user's sockets (e.g. on ban). */
+export function disconnectUser(userId: number) {
+  io?.sockets.sockets.forEach((s) => {
+    if ((s.data as any).userId === userId) s.disconnect(true);
+  });
+}
+
 /** Add specific members' sockets to a room (private channel / DM). */
 export function joinUsersToRoom(userIds: number[], room: string) {
   io?.sockets.sockets.forEach((s) => {
