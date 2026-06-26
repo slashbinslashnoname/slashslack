@@ -262,7 +262,7 @@ function SortableChannel({
         fontWeight: c.unread ? 600 : 400,
         touchAction: "none",
       }}
-      className="flex items-center gap-2 w-full h-8 px-2 rounded-md text-sm text-left"
+      className="flex items-center gap-2 w-full h-8 pl-7 pr-2 rounded-md text-sm text-left"
     >
       {c.isPrivate ? <Lock size={15} /> : <Icon name={c.icon} size={15} />}
       <span className="truncate flex-1">{c.name}</span>
