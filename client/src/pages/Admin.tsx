@@ -9,7 +9,7 @@ import { IconPicker } from "../components/IconPicker";
 import { SortableList } from "../components/Sortable";
 import { useCategories, useChannels, useSettings } from "../lib/queries";
 
-const TABS = ["Branding", "Theme", "Channels", "Access", "Members"] as const;
+const TABS = ["Branding", "Theme", "Channels", "Email", "Access", "Members"] as const;
 
 export function Admin({ me }: { me: PublicUser }) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Branding");
@@ -40,6 +40,7 @@ export function Admin({ me }: { me: PublicUser }) {
         {tab === "Branding" && <Branding />}
         {tab === "Theme" && <Theme />}
         {tab === "Channels" && <Channels />}
+        {tab === "Email" && <SmtpSettings />}
         {tab === "Access" && <Access />}
         {tab === "Members" && <Members me={me} />}
       </div>
@@ -96,9 +97,21 @@ function SmtpSettings() {
     qc.invalidateQueries({ queryKey: ["smtp"] });
   };
 
+  const useResend = () =>
+    setForm({ ...form, enabled: true, host: "smtp.resend.com", port: 465, user: "resend", secure: true });
+
   const input = "border border-border rounded-theme px-3 py-2 bg-elev";
   return (
     <Field label="Email (SMTP)">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xs text-muted">Quick setup:</span>
+        <button onClick={useResend} className="text-xs border border-border rounded-theme px-2 py-1 hover:bg-elev">
+          Use Resend
+        </button>
+        <span className="text-xs text-muted">
+          (then paste your Resend <strong>API key</strong> as the password, and set a verified “From”)
+        </span>
+      </div>
       <label className="flex items-center gap-2 mb-3">
         <input type="checkbox" checked={form.enabled} onChange={(e) => set({ enabled: e.target.checked })} />
         <span className="text-sm">Send invitation emails via SMTP</span>
@@ -282,8 +295,23 @@ function Theme() {
     <div className="flex flex-col gap-6">
       <Field label="Presets">
         <div className="flex gap-2 flex-wrap">
-          {Object.keys(settings.presets).map((p) => (
-            <button key={p} onClick={() => applyPreset(p)} className="px-4 py-2 border border-border rounded-theme capitalize hover:bg-elev">{p}</button>
+          {Object.entries(settings.presets).map(([p, tokens]) => (
+            <button
+              key={p}
+              onClick={() => applyPreset(p)}
+              className="flex items-center gap-2 pl-2 pr-3 py-1.5 border border-border rounded-theme hover:bg-elev"
+            >
+              <span className="flex">
+                {["--sidebar", "--accent", "--bg", "--mention"].map((k) => (
+                  <span
+                    key={k}
+                    className="w-4 h-4 rounded-sm border border-border/60 -ml-1 first:ml-0"
+                    style={{ background: (tokens as Record<string, string>)[k] }}
+                  />
+                ))}
+              </span>
+              <span className="capitalize text-sm">{p}</span>
+            </button>
           ))}
         </div>
       </Field>
@@ -490,12 +518,10 @@ function Access() {
         </div>
       </Field>
 
-      <SmtpSettings />
-
       <Field label="Invite people by email">
         {!data?.mailerConfigured && (
           <div className="text-xs text-muted mb-2">
-            SMTP is not configured — invites still work, just copy the generated link. Configure SMTP above to send real emails.
+            SMTP is not configured — invites still work, just copy the generated link. Configure it in the <strong>Email</strong> tab to send real emails.
           </div>
         )}
         <div className="flex gap-2">

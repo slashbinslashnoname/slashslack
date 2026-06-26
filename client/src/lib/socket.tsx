@@ -227,8 +227,27 @@ export function SocketProvider({
           old ? [n, ...old] : [n],
         );
         qc.invalidateQueries({ queryKey: ["channels"] });
-        if (Notification && Notification.permission === "granted") {
-          new Notification(n.actor?.displayName || "New message", { body: n.preview });
+        // Desktop notification — only when the API is available, permission is
+        // granted, and the tab is in the background (avoids notifying while you're
+        // already looking at the app). Requires a secure context (https/localhost).
+        if (
+          "Notification" in window &&
+          Notification.permission === "granted" &&
+          document.visibilityState !== "visible"
+        ) {
+          try {
+            const notif = new Notification(n.actor?.displayName || "New message", {
+              body: n.preview,
+              icon: "/favicon.svg",
+              tag: `slashslack-${n.id}`,
+            });
+            notif.onclick = () => {
+              window.focus();
+              notif.close();
+            };
+          } catch {
+            /* notifications unsupported in this context */
+          }
         }
       });
 
