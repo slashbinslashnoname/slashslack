@@ -81,6 +81,7 @@ export function loadMessages(ids: number[]): Message[] {
         avatarUrl: null,
         role: "member",
         status: "offline",
+        statusText: null,
       },
       body: m.deletedAt ? "" : m.body,
       createdAt: m.createdAt,

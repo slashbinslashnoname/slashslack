@@ -1,12 +1,13 @@
 import { useState } from "react";
 import type { Message, PublicUser } from "@slashslack/shared";
-import { MessageSquare, SmilePlus, Pencil, Trash2, Check, X, Pin, Bookmark } from "lucide-react";
+import { MessageSquare, SmilePlus, Pencil, Trash2, Check, X, Pin, Bookmark, Link2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Avatar } from "./Avatar";
 import { MessageBody } from "./MessageBody";
 import { Attachments, LinkPreviews } from "./Attachments";
 import { EmojiPicker } from "./EmojiPicker";
-import { formatTime } from "../lib/util";
+import { HoverMenu } from "./HoverMenu";
+import { formatTime, messageLink } from "../lib/util";
 import { api } from "../lib/api";
 import { useBookmarks, useToggleReaction } from "../lib/queries";
 
@@ -15,16 +16,17 @@ export function MessageItem({
   me,
   users,
   compact,
+  highlighted,
   onOpenThread,
 }: {
   message: Message;
   me: PublicUser;
   users: PublicUser[];
   compact?: boolean;
+  highlighted?: boolean;
   onOpenThread?: (m: Message) => void;
 }) {
-  const [hover, setHover] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.body);
   const react = useToggleReaction();
@@ -32,6 +34,7 @@ export function MessageItem({
   const { data: bookmarks } = useBookmarks();
   const mine = message.user.id === me.id;
   const bookmarked = !!bookmarks?.ids.includes(message.id);
+  const copyLink = () => navigator.clipboard.writeText(messageLink(message));
 
   const togglePin = async () => {
     await api.post(`/api/messages/${message.id}/pin`);
@@ -56,13 +59,9 @@ export function MessageItem({
 
   return (
     <div
-      className="group relative px-4 hover:bg-sidebar-active/5 flex gap-3"
+      id={`msg-${message.id}`}
+      className={`group relative px-4 flex gap-3 ${highlighted ? "highlight-flash" : "hover:bg-sidebar-active/5"}`}
       style={{ paddingTop: compact ? 1 : 8, paddingBottom: 1 }}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => {
-        setHover(false);
-        setPickerOpen(false);
-      }}
     >
       <div className="w-9 shrink-0">
         {!compact ? (
@@ -143,25 +142,40 @@ export function MessageItem({
         )}
       </div>
 
-      {/* hover toolbar */}
-      {hover && !editing && (
-        <div className="absolute -top-3 right-3 flex items-center gap-1 bg-elev border border-border rounded-theme shadow px-1 py-0.5">
-          <div className="relative">
-            <button className="p-1 hover:text-accent" onClick={() => setPickerOpen((v) => !v)}>
-              <SmilePlus size={16} />
-            </button>
-            {pickerOpen && (
+      {/* hover toolbar — stays visible while a popover within it is open */}
+      {!editing && (
+        <div
+          className={`absolute -top-3 right-3 flex items-center gap-1 bg-elev border border-border rounded-theme shadow px-1 py-0.5 transition-opacity ${
+            menuOpen
+              ? "opacity-100"
+              : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto"
+          }`}
+        >
+          <HoverMenu
+            align="right"
+            onOpenChange={setMenuOpen}
+            button={({ toggle }) => (
+              <button className="p-1 hover:text-accent" onClick={toggle} title="Add reaction">
+                <SmilePlus size={16} />
+              </button>
+            )}
+            panel={({ close }) => (
               <EmojiPicker
-                onPick={(e) => react.mutate({ id: message.id, emoji: e })}
-                onClose={() => setPickerOpen(false)}
+                onPick={(e) => {
+                  react.mutate({ id: message.id, emoji: e });
+                  close();
+                }}
               />
             )}
-          </div>
+          />
           {!message.parentId && onOpenThread && (
-            <button className="p-1 hover:text-accent" onClick={() => onOpenThread(message)}>
+            <button className="p-1 hover:text-accent" onClick={() => onOpenThread(message)} title="Reply in thread">
               <MessageSquare size={16} />
             </button>
           )}
+          <button className="p-1 hover:text-accent" title="Copy link to message" onClick={copyLink}>
+            <Link2 size={16} />
+          </button>
           <button
             className="p-1 hover:text-accent"
             title={bookmarked ? "Remove bookmark" : "Save for later"}
@@ -181,13 +195,14 @@ export function MessageItem({
             </button>
           )}
           {mine && (
-            <button className="p-1 hover:text-accent" onClick={() => { setDraft(message.body); setEditing(true); }}>
+            <button className="p-1 hover:text-accent" title="Edit" onClick={() => { setDraft(message.body); setEditing(true); }}>
               <Pencil size={16} />
             </button>
           )}
           {(mine || me.role === "admin") && (
             <button
               className="p-1 hover:text-danger"
+              title="Delete"
               onClick={() => { if (confirm("Delete this message?")) api.del(`/api/messages/${message.id}`); }}
             >
               <Trash2 size={16} />

@@ -52,6 +52,74 @@ function patchSettings(qc: ReturnType<typeof useQueryClient>, patch: Partial<App
     .then((r) => qc.setQueryData(["settings"], r.settings));
 }
 
+interface SmtpForm {
+  enabled: boolean;
+  host: string;
+  port: number;
+  user: string;
+  from: string;
+  secure: boolean;
+  hasPassword: boolean;
+}
+
+function SmtpSettings() {
+  const qc = useQueryClient();
+  const [form, setForm] = useState<SmtpForm | null>(null);
+  const [pass, setPass] = useState("");
+  const [saved, setSaved] = useState(false);
+  useQuery({
+    queryKey: ["smtp"],
+    queryFn: async () => {
+      const r = await api.get<{ smtp: SmtpForm }>("/api/settings/smtp");
+      setForm(r.smtp);
+      return r;
+    },
+  });
+  if (!form) return null;
+  const set = (p: Partial<SmtpForm>) => setForm({ ...form, ...p });
+
+  const save = async () => {
+    await api.patch("/api/settings/smtp", {
+      enabled: form.enabled,
+      host: form.host,
+      port: Number(form.port),
+      user: form.user,
+      from: form.from,
+      secure: form.secure,
+      ...(pass ? { pass } : {}),
+    });
+    setPass("");
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+    qc.invalidateQueries({ queryKey: ["invites"] });
+    qc.invalidateQueries({ queryKey: ["smtp"] });
+  };
+
+  const input = "border border-border rounded-theme px-3 py-2 bg-elev";
+  return (
+    <Field label="Email (SMTP)">
+      <label className="flex items-center gap-2 mb-3">
+        <input type="checkbox" checked={form.enabled} onChange={(e) => set({ enabled: e.target.checked })} />
+        <span className="text-sm">Send invitation emails via SMTP</span>
+      </label>
+      <div className="grid grid-cols-2 gap-3">
+        <input className={input} placeholder="Host (smtp.example.com)" value={form.host} onChange={(e) => set({ host: e.target.value })} />
+        <input className={input} type="number" placeholder="Port" value={form.port} onChange={(e) => set({ port: Number(e.target.value) })} />
+        <input className={input} placeholder="Username" value={form.user} onChange={(e) => set({ user: e.target.value })} />
+        <input className={input} type="password" placeholder={form.hasPassword ? "•••••• (unchanged)" : "Password"} value={pass} onChange={(e) => setPass(e.target.value)} />
+        <input className={`${input} col-span-2`} placeholder='From ("SlashSlack <no-reply@example.com>")' value={form.from} onChange={(e) => set({ from: e.target.value })} />
+      </div>
+      <label className="flex items-center gap-2 mt-3">
+        <input type="checkbox" checked={form.secure} onChange={(e) => set({ secure: e.target.checked })} />
+        <span className="text-sm">Use TLS (secure, usually port 465)</span>
+      </label>
+      <button onClick={save} className="bg-accent text-accent-fg px-4 py-2 rounded-theme mt-3">
+        {saved ? "Saved!" : "Save SMTP settings"}
+      </button>
+    </Field>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -202,14 +270,6 @@ function Channels() {
     await api.post("/api/channels/reorder", { ids, categoryId });
     refresh();
   };
-  const reorderPromoted = async (ids: number[]) => {
-    await api.post("/api/channels/reorder", { ids });
-    refresh();
-  };
-  const togglePromote = async (c: Channel) => {
-    await api.patch(`/api/channels/${c.id}`, { isPromoted: !c.isPromoted });
-    refresh();
-  };
   const moveChannel = async (c: Channel, categoryId: number | null) => {
     await api.patch(`/api/channels/${c.id}`, { categoryId });
     refresh();
@@ -233,13 +293,9 @@ function Channels() {
           <option key={cat.id} value={cat.id}>{cat.name}</option>
         ))}
       </select>
-      <button onClick={() => togglePromote(c)} title="Toggle promoted" style={{ color: c.isPromoted ? "var(--accent)" : "var(--fg-muted)" }}>
-        <Star size={16} fill={c.isPromoted ? "var(--accent)" : "none"} />
-      </button>
     </div>
   );
 
-  const promoted = channels.filter((c) => c.isPromoted).sort((a, b) => a.position - b.position);
   const groups: { cat: Category | null; list: Channel[] }[] = [
     ...categories.map((cat) => ({
       cat,
@@ -256,12 +312,6 @@ function Channels() {
           <button onClick={addCategory} className="bg-accent text-accent-fg px-4 rounded-theme flex items-center gap-1"><Plus size={16} /> Add</button>
         </div>
       </Field>
-
-      {promoted.length > 0 && (
-        <Field label="Promoted channels (drag to reorder)">
-          <SortableList items={promoted} onReorder={reorderPromoted} render={renderChannel} />
-        </Field>
-      )}
 
       <Field label="Reorder categories (drag handle)">
         <SortableList
@@ -358,10 +408,12 @@ function Access() {
         </div>
       </Field>
 
+      <SmtpSettings />
+
       <Field label="Invite people by email">
         {!data?.mailerConfigured && (
           <div className="text-xs text-muted mb-2">
-            SMTP is not configured — invites still work, just copy the generated link. Set SMTP_HOST/PORT/USER/PASS/FROM to send real emails.
+            SMTP is not configured — invites still work, just copy the generated link. Configure SMTP above to send real emails.
           </div>
         )}
         <div className="flex gap-2">

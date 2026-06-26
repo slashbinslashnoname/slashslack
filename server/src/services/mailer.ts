@@ -1,27 +1,30 @@
-import nodemailer, { type Transporter } from "nodemailer";
+import nodemailer from "nodemailer";
+import { getSettings } from "../db/index.js";
+import type { SmtpConfig } from "../settings.js";
 
-let transporter: Transporter | null = null;
-let initialized = false;
-
-/** SMTP is optional. When unconfigured, the app falls back to returning the link. */
-export function mailerConfigured(): boolean {
-  return !!process.env.SMTP_HOST;
+/**
+ * Resolve SMTP config: admin settings (DB) take precedence; otherwise fall back
+ * to environment variables. Returns null when nothing is configured.
+ */
+export function resolveSmtp(): SmtpConfig | null {
+  const s = getSettings().smtp;
+  if (s && s.enabled && s.host) return s;
+  if (process.env.SMTP_HOST) {
+    return {
+      enabled: true,
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT) || 587,
+      user: process.env.SMTP_USER || "",
+      pass: process.env.SMTP_PASS || "",
+      from: process.env.SMTP_FROM || "SlashSlack <no-reply@slashslack.local>",
+      secure: process.env.SMTP_SECURE === "true",
+    };
+  }
+  return null;
 }
 
-function getTransporter(): Transporter | null {
-  if (initialized) return transporter;
-  initialized = true;
-  if (!process.env.SMTP_HOST) return null;
-  transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: process.env.SMTP_SECURE === "true",
-    auth:
-      process.env.SMTP_USER && process.env.SMTP_PASS
-        ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-        : undefined,
-  });
-  return transporter;
+export function mailerConfigured(): boolean {
+  return !!resolveSmtp();
 }
 
 export interface SendResult {
@@ -35,11 +38,17 @@ export async function sendMail(opts: {
   html: string;
   text: string;
 }): Promise<SendResult> {
-  const t = getTransporter();
-  if (!t) return { sent: false };
+  const cfg = resolveSmtp();
+  if (!cfg) return { sent: false };
   try {
+    const t = nodemailer.createTransport({
+      host: cfg.host,
+      port: cfg.port,
+      secure: cfg.secure,
+      auth: cfg.user && cfg.pass ? { user: cfg.user, pass: cfg.pass } : undefined,
+    });
     await t.sendMail({
-      from: process.env.SMTP_FROM || "SlashSlack <no-reply@slashslack.local>",
+      from: cfg.from || "SlashSlack <no-reply@slashslack.local>",
       ...opts,
     });
     return { sent: true };

@@ -25,6 +25,7 @@ export function toPublicUser(u: {
   displayName: string;
   avatarUrl: string | null;
   role: string;
+  statusText?: string | null;
 }): PublicUser {
   return {
     id: u.id,
@@ -33,6 +34,7 @@ export function toPublicUser(u: {
     avatarUrl: u.avatarUrl,
     role: u.role as PublicUser["role"],
     status: presence.isOnline(u.id) ? "online" : "offline",
+    statusText: u.statusText ?? null,
   };
 }
 

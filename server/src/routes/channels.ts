@@ -156,6 +156,21 @@ export async function channelRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  // toggle a personal favorite ("promoted") channel — per user
+  app.post("/api/channels/:id/favorite", { preHandler: requireAuth }, async (req) => {
+    const id = Number((req.params as any).id);
+    const user = currentUser(req);
+    const existing = raw
+      .prepare("SELECT 1 FROM user_channel_favorites WHERE user_id = ? AND channel_id = ?")
+      .get(user.id, id);
+    if (existing) {
+      raw.prepare("DELETE FROM user_channel_favorites WHERE user_id = ? AND channel_id = ?").run(user.id, id);
+      return { favorite: false };
+    }
+    raw.prepare("INSERT INTO user_channel_favorites (user_id, channel_id) VALUES (?, ?)").run(user.id, id);
+    return { favorite: true };
+  });
+
   // save the user's personal sidebar layout (overrides admin defaults, per user)
   app.post("/api/channels/layout", { preHandler: requireAuth }, async (req, reply) => {
     const user = currentUser(req);

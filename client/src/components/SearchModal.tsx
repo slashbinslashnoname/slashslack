@@ -11,10 +11,12 @@ import { useChannels } from "../lib/queries";
 
 export function SearchModal({
   onClose,
-  onJump,
+  onJumpScope,
+  onJumpMessage,
 }: {
   onClose: () => void;
-  onJump: (scope: string) => void;
+  onJumpScope: (scope: string) => void;
+  onJumpMessage: (m: Message) => void;
 }) {
   const [q, setQ] = useState("");
   const { data: channels = [] } = useChannels();
@@ -51,7 +53,7 @@ export function SearchModal({
               <button
                 key={c.id}
                 onClick={() => {
-                  onJump(`channel:${c.id}`);
+                  onJumpScope(`channel:${c.id}`);
                   onClose();
                 }}
                 className="flex items-center gap-2 p-2 rounded-theme hover:bg-sidebar-active/10 text-left"
@@ -71,7 +73,7 @@ export function SearchModal({
           <button
             key={m.id}
             onClick={() => {
-              onJump(m.channelId ? `channel:${m.channelId}` : `dm:${m.dmId}`);
+              onJumpMessage(m);
               onClose();
             }}
             className="flex gap-3 text-left p-2 rounded-theme hover:bg-sidebar-active/10"

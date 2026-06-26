@@ -1,5 +1,18 @@
 import type { AppSettings, ThemeTokens } from "@slashslack/shared";
 
+export interface SmtpConfig {
+  enabled: boolean;
+  host: string;
+  port: number;
+  user: string;
+  pass: string;
+  from: string;
+  secure: boolean;
+}
+
+/** Server-side stored settings = public AppSettings + private SMTP config. */
+export type StoredSettings = AppSettings & { smtp?: SmtpConfig };
+
 /**
  * Theme is fully token-driven: every color in the UI is a CSS variable.
  * Admin can override any token live. We ship a few presets.

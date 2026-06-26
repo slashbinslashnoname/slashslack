@@ -23,6 +23,22 @@ export function formatDay(iso: string) {
   return d.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
 }
 
+/** Router path for a scope ("channel:ID" | "dm:ID"). */
+export function scopePath(scope: string) {
+  const [kind, id] = scope.split(":");
+  return kind === "channel" ? `/c/${id}` : `/dm/${id}`;
+}
+
+/** Router path for a specific message (permalink). */
+export function messagePath(m: { channelId: number | null; dmId: number | null; id: number }) {
+  return m.channelId ? `/c/${m.channelId}/${m.id}` : `/dm/${m.dmId}/${m.id}`;
+}
+
+/** Absolute permalink URL to a message. */
+export function messageLink(m: { channelId: number | null; dmId: number | null; id: number }) {
+  return `${location.origin}${messagePath(m)}`;
+}
+
 export function humanSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;

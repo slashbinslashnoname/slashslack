@@ -10,6 +10,7 @@ import { broadcast } from "../realtime/index.js";
 const updateMeSchema = z.object({
   displayName: z.string().min(1).max(60).optional(),
   avatarUrl: z.string().nullable().optional(),
+  statusText: z.string().max(100).nullable().optional(),
 });
 
 export async function userRoutes(app: FastifyInstance) {
@@ -27,13 +28,14 @@ export async function userRoutes(app: FastifyInstance) {
       .set({
         ...(parsed.data.displayName !== undefined ? { displayName: parsed.data.displayName } : {}),
         ...(parsed.data.avatarUrl !== undefined ? { avatarUrl: parsed.data.avatarUrl } : {}),
+        ...(parsed.data.statusText !== undefined ? { statusText: parsed.data.statusText } : {}),
       })
       .where(eq(users.id, me.id))
       .run();
     const updated = db.select().from(users).where(eq(users.id, me.id)).get()!;
     const pub = toPublicUser(updated);
-    // let everyone refresh the user's name/avatar in real time
-    broadcast(SocketEvents.PresenceUpdate, pub);
+    // refresh the user's name/avatar/status everywhere in real time
+    broadcast(SocketEvents.UserUpdated, pub);
     return { user: pub };
   });
 }

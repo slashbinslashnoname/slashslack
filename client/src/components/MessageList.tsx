@@ -14,10 +14,12 @@ function sameDay(a: string, b: string) {
 export function MessageList({
   scope,
   me,
+  focusMessageId,
   onOpenThread,
 }: {
   scope: string;
   me: PublicUser;
+  focusMessageId?: number | null;
   onOpenThread: (m: Message) => void;
 }) {
   const { data: messages = [], isLoading } = useMessages(scope);
@@ -45,11 +47,40 @@ export function MessageList({
   const qc = useQueryClient();
   const [hasMore, setHasMore] = useState(true);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const [highlightId, setHighlightId] = useState<number | null>(null);
+  const focusedRef = useRef<number | null>(null);
 
-  // jump to bottom on new messages / scope change, but not while loading older
+  // jump to bottom on new messages / scope change, unless focusing a permalink
   useEffect(() => {
-    if (!loadingOlder) bottomRef.current?.scrollIntoView({ behavior: "auto" });
-  }, [messages.length, scope]);
+    if (!loadingOlder && !focusMessageId) bottomRef.current?.scrollIntoView({ behavior: "auto" });
+  }, [messages.length, scope, focusMessageId]);
+
+  // permalink focus: ensure the target is loaded, scroll to it, and flash it
+  useEffect(() => {
+    if (!focusMessageId || focusedRef.current === focusMessageId) return;
+    const flash = () => {
+      requestAnimationFrame(() => {
+        document.getElementById(`msg-${focusMessageId}`)?.scrollIntoView({ block: "center" });
+        setHighlightId(focusMessageId);
+        window.setTimeout(() => setHighlightId(null), 2500);
+      });
+    };
+    if (messages.some((m) => m.id === focusMessageId)) {
+      focusedRef.current = focusMessageId;
+      flash();
+    } else if (messages.length) {
+      focusedRef.current = focusMessageId;
+      const [kind, id] = scope.split(":");
+      const url =
+        kind === "channel"
+          ? `/api/channels/${id}/messages?around=${focusMessageId}`
+          : `/api/dms/${id}/messages?around=${focusMessageId}`;
+      api.get<{ messages: Message[] }>(url).then((res) => {
+        qc.setQueryData(["messages", scope], res.messages);
+        window.setTimeout(flash, 60);
+      });
+    }
+  }, [focusMessageId, messages, scope, qc]);
 
   useEffect(() => setHasMore(true), [scope]);
 
@@ -132,6 +163,7 @@ export function MessageList({
               me={me}
               users={users}
               compact={!!grouped}
+              highlighted={highlightId === m.id}
               onOpenThread={onOpenThread}
             />
           </div>

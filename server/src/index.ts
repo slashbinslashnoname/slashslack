@@ -19,6 +19,8 @@ import { notificationRoutes } from "./routes/notifications.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { extraRoutes } from "./routes/extras.js";
 import { inviteRoutes } from "./routes/invites.js";
+import { nasaRoutes } from "./routes/nasa.js";
+import { webhookRoutes } from "./routes/webhooks.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
@@ -76,6 +78,8 @@ async function main() {
   await app.register(settingsRoutes);
   await app.register(extraRoutes);
   await app.register(inviteRoutes);
+  await app.register(nasaRoutes);
+  await app.register(webhookRoutes);
 
   // serve the built client (single-container deployment) with SPA fallback
   const clientDist = path.resolve(__dirname, "../../client/dist");

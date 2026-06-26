@@ -6,6 +6,7 @@ import { useSendMessage, useUsers } from "../lib/queries";
 import { useSocket } from "../lib/socket";
 import { SocketEvents } from "@slashslack/shared";
 import { EmojiPicker } from "./EmojiPicker";
+import { HoverMenu } from "./HoverMenu";
 import { humanSize } from "../lib/util";
 
 interface Props {
@@ -20,7 +21,6 @@ export function Composer({ channelId, dmId, parentId, placeholder }: Props) {
   const [pending, setPending] = useState<Attachment[]>([]);
   const [mentions, setMentions] = useState<{ name: string; id: number }[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
-  const [showEmoji, setShowEmoji] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const lastTyping = useRef(0);
@@ -206,15 +206,22 @@ export function Composer({ channelId, dmId, parentId, placeholder }: Props) {
             <button className="p-1.5 text-muted hover:text-accent" onClick={() => fileInput.current?.click()}>
               <Paperclip size={18} />
             </button>
-            <button className="p-1.5 text-muted hover:text-accent" onClick={() => setShowEmoji((v) => !v)}>
-              <SmilePlus size={18} />
-            </button>
-            {showEmoji && (
-              <EmojiPicker
-                onPick={(e) => setText((t) => t + e)}
-                onClose={() => setShowEmoji(false)}
-              />
-            )}
+            <HoverMenu
+              align="left"
+              button={({ toggle }) => (
+                <button className="p-1.5 text-muted hover:text-accent" onClick={toggle} title="Emoji">
+                  <SmilePlus size={18} />
+                </button>
+              )}
+              panel={({ close }) => (
+                <EmojiPicker
+                  onPick={(e) => {
+                    setText((t) => t + e);
+                    close();
+                  }}
+                />
+              )}
+            />
             <input
               ref={fileInput}
               type="file"

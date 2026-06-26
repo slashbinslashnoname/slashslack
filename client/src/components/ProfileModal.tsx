@@ -10,6 +10,7 @@ export function ProfileModal({ me, onClose }: { me: PublicUser; onClose: () => v
   const qc = useQueryClient();
   const [displayName, setDisplayName] = useState(me.displayName);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(me.avatarUrl);
+  const [statusText, setStatusText] = useState(me.statusText ?? "");
   const [busy, setBusy] = useState(false);
 
   const preview: PublicUser = { ...me, displayName, avatarUrl };
@@ -25,6 +26,7 @@ export function ProfileModal({ me, onClose }: { me: PublicUser; onClose: () => v
       const { user } = await api.patch<{ user: PublicUser }>("/api/users/me", {
         displayName: displayName.trim(),
         avatarUrl,
+        statusText: statusText.trim() || null,
       });
       qc.setQueryData(["me"], user);
       qc.invalidateQueries({ queryKey: ["users"] });
@@ -63,6 +65,15 @@ export function ProfileModal({ me, onClose }: { me: PublicUser; onClose: () => v
       <input
         value={displayName}
         onChange={(e) => setDisplayName(e.target.value)}
+        className="w-full border border-border rounded-theme px-3 py-2 mb-3 bg-elev"
+      />
+
+      <label className="block text-sm font-medium mb-1">Status</label>
+      <input
+        value={statusText}
+        onChange={(e) => setStatusText(e.target.value)}
+        placeholder="e.g. 🌴 On vacation, 🎧 Focusing…"
+        maxLength={100}
         className="w-full border border-border rounded-theme px-3 py-2 mb-2 bg-elev"
       />
       <p className="text-xs text-muted mb-4">

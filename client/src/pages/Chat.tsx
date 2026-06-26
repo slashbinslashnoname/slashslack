@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Message, PublicUser } from "@slashslack/shared";
-import { Lock, Users, Pin, Bookmark, Menu } from "lucide-react";
+import { Lock, Users, Pin, Bookmark, Menu, Star, Webhook } from "lucide-react";
+import { scopePath, messagePath } from "../lib/util";
 import { Sidebar } from "../components/Sidebar";
 import { MessageList } from "../components/MessageList";
 import { Composer } from "../components/Composer";
@@ -13,6 +15,7 @@ import { SearchModal } from "../components/SearchModal";
 import { NotificationsPanel } from "../components/NotificationsPanel";
 import { MessageListModal } from "../components/MessageListModal";
 import { ProfileModal } from "../components/ProfileModal";
+import { WebhookModal } from "../components/WebhookModal";
 import { Icon } from "../components/Icon";
 import { Avatar } from "../components/Avatar";
 import { useBookmarks, useChannels, useDms, usePins, useSettings } from "../lib/queries";
@@ -23,21 +26,43 @@ export function Chat({ me }: { me: PublicUser }) {
   const { data: dms = [] } = useDms();
   const { data: settings } = useSettings();
   const qc = useQueryClient();
-  const [scope, setScope] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const params = useParams();
+
+  // scope + focused message are driven by the URL (permalinks / deep links)
+  const scope = params.channelId
+    ? `channel:${params.channelId}`
+    : params.dmId
+      ? `dm:${params.dmId}`
+      : null;
+  const focusMessageId = params.messageId ? Number(params.messageId) : null;
+  const setScope = (s: string) => navigate(scopePath(s));
+  const jumpToMessage = (m: { channelId: number | null; dmId: number | null; id: number }) =>
+    navigate(messagePath(m));
+
   const [thread, setThread] = useState<Message | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [newChannelCategory, setNewChannelCategory] = useState<number | null>(null);
   const [modal, setModal] = useState<
-    null | "channel" | "dm" | "search" | "notifs" | "pins" | "saved" | "profile"
+    null | "channel" | "dm" | "search" | "notifs" | "pins" | "saved" | "profile" | "webhooks"
   >(null);
 
   const [kindForPins, idForPins] = scope ? scope.split(":") : ["", ""];
   const { data: pins = [] } = usePins(kindForPins === "channel" ? Number(idForPins) : null);
   const { data: bookmarks } = useBookmarks();
 
+  const currentChannel =
+    kindForPins === "channel" ? channels.find((c) => c.id === Number(idForPins)) : undefined;
+  const toggleFavorite = async () => {
+    if (!currentChannel) return;
+    await api.post(`/api/channels/${currentChannel.id}/favorite`);
+    qc.invalidateQueries({ queryKey: ["channels"] });
+  };
+
+  // default to the first channel
   useEffect(() => {
-    if (!scope && channels.length) setScope(`channel:${channels[0].id}`);
-  }, [channels, scope]);
+    if (!scope && channels.length) navigate(`/c/${channels[0].id}`, { replace: true });
+  }, [channels, scope, navigate]);
 
   // tab title: current channel/DM + workspace name
   useEffect(() => {
@@ -145,6 +170,16 @@ export function Chat({ me }: { me: PublicUser }) {
               <Menu size={20} />
             </button>
             <div className="min-w-0 flex-1">{header}</div>
+            {kind === "channel" && currentChannel && (
+              <button
+                onClick={toggleFavorite}
+                title={currentChannel.isPromoted ? "Remove from promoted" : "Promote (favorite)"}
+                style={{ color: currentChannel.isPromoted ? "var(--accent)" : undefined }}
+                className="text-muted hover:text-fg"
+              >
+                <Star size={18} fill={currentChannel.isPromoted ? "var(--accent)" : "none"} />
+              </button>
+            )}
             {kind === "channel" && (
               <button
                 onClick={() => setModal("pins")}
@@ -159,6 +194,11 @@ export function Chat({ me }: { me: PublicUser }) {
                 )}
               </button>
             )}
+            {kind === "channel" && (
+              <button onClick={() => setModal("webhooks")} title="Webhooks" className="text-muted hover:text-fg">
+                <Webhook size={18} />
+              </button>
+            )}
             <button onClick={() => setModal("saved")} title="Saved items" className="text-muted hover:text-fg">
               <Bookmark size={18} />
             </button>
@@ -166,7 +206,7 @@ export function Chat({ me }: { me: PublicUser }) {
 
           {scope ? (
             <>
-              <MessageList scope={scope} me={me} onOpenThread={setThread} />
+              <MessageList scope={scope} me={me} focusMessageId={focusMessageId} onOpenThread={setThread} />
               <TypingIndicator scope={scope} me={me} />
               <Composer
                 channelId={kind === "channel" ? numId : undefined}
@@ -194,16 +234,29 @@ export function Chat({ me }: { me: PublicUser }) {
         />
       )}
       {modal === "dm" && <NewDmModal me={me} onClose={() => setModal(null)} onCreated={setScope} />}
-      {modal === "search" && <SearchModal onClose={() => setModal(null)} onJump={setScope} />}
+      {modal === "search" && (
+        <SearchModal
+          onClose={() => setModal(null)}
+          onJumpScope={setScope}
+          onJumpMessage={jumpToMessage}
+        />
+      )}
       {modal === "notifs" && <NotificationsPanel onClose={() => setModal(null)} onJump={setScope} />}
       {modal === "profile" && <ProfileModal me={me} onClose={() => setModal(null)} />}
+      {modal === "webhooks" && currentChannel && (
+        <WebhookModal
+          channelId={currentChannel.id}
+          channelName={currentChannel.name}
+          onClose={() => setModal(null)}
+        />
+      )}
       {modal === "pins" && (
         <MessageListModal
           title="Pinned messages"
           messages={pins}
           emptyText="No pinned messages yet. Hover a message and click the pin icon."
           onClose={() => setModal(null)}
-          onJump={setScope}
+          onSelect={jumpToMessage}
         />
       )}
       {modal === "saved" && (
@@ -212,7 +265,7 @@ export function Chat({ me }: { me: PublicUser }) {
           messages={bookmarks?.messages ?? []}
           emptyText="Nothing saved yet. Hover a message and click the bookmark icon."
           onClose={() => setModal(null)}
-          onJump={setScope}
+          onSelect={jumpToMessage}
         />
       )}
     </div>

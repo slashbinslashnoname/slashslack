@@ -35,12 +35,18 @@ export function SocketProvider({
   uiRef.current = ui;
 
   useEffect(() => {
-    let active = true;
-    let s: Socket;
-    (async () => {
-      const { token } = await api.get<{ token: string }>("/api/auth/socket");
-      if (!active) return;
-      s = io({ auth: { token }, withCredentials: true });
+    {
+      // Fetch a fresh handshake token on every (re)connect attempt, so the
+      // socket can always reconnect after a server restart or network blip.
+      const s = io({
+        withCredentials: true,
+        auth: (cb) => {
+          api
+            .get<{ token: string }>("/api/auth/socket")
+            .then((r) => cb({ token: r.token }))
+            .catch(() => cb({}));
+        },
+      });
       setSocket(s);
 
       const upsertInList = (msg: Message) => {
@@ -92,6 +98,10 @@ export function SocketProvider({
                 ? { ...old, replies: old.replies.map((r) => (r.id === msg.id ? msg : r)) }
                 : old,
           );
+        if (msg.channelId)
+          qc.setQueryData<Message[]>(["pins", msg.channelId], (old) =>
+            old?.map((m) => (m.id === msg.id ? msg : m)),
+          );
       });
 
       s.on(SocketEvents.MessageDelete, (p: { id: number; channelId: number | null; dmId: number | null }) => {
@@ -100,6 +110,12 @@ export function SocketProvider({
           old?.map((m) =>
             m.id === p.id ? { ...m, deletedAt: new Date().toISOString(), body: "" } : m,
           ),
+        );
+        // drop it from the pinned list and any open thread
+        if (p.channelId)
+          qc.setQueryData<Message[]>(["pins", p.channelId], (old) => old?.filter((m) => m.id !== p.id));
+        qc.setQueriesData<{ parent: Message; replies: Message[] }>({ queryKey: ["thread"] }, (old) =>
+          old ? { ...old, replies: old.replies.filter((r) => r.id !== p.id) } : old,
         );
       });
 
@@ -132,10 +148,15 @@ export function SocketProvider({
         );
       });
 
-      s.on(SocketEvents.MessagePinned, (p: { message: Message }) => {
+      s.on(SocketEvents.MessagePinned, (p: { message: Message; pinned: boolean }) => {
         upsertInList(p.message);
-        if (p.message.channelId)
-          qc.invalidateQueries({ queryKey: ["pins", p.message.channelId] });
+        if (p.message.channelId) {
+          // update the pinned list live (add/remove) — no refetch needed
+          qc.setQueryData<Message[]>(["pins", p.message.channelId], (old) => {
+            const without = (old ?? []).filter((m) => m.id !== p.message.id);
+            return p.pinned ? [p.message, ...without] : without;
+          });
+        }
       });
 
       s.on(
@@ -162,6 +183,21 @@ export function SocketProvider({
         uiRef.current.setPresence(u.id, u.status);
       });
 
+      // profile change: refresh the user's name/avatar/status everywhere
+      s.on(SocketEvents.UserUpdated, (u: PublicUser) => {
+        qc.setQueryData<PublicUser[]>(["users"], (old) =>
+          old?.map((x) => (x.id === u.id ? { ...x, ...u } : x)),
+        );
+        qc.setQueryData<PublicUser>(["me"], (old) => (old?.id === u.id ? { ...old, ...u } : old));
+        // patch the embedded author on already-loaded messages + threads
+        const patch = (m: Message): Message => (m.user.id === u.id ? { ...m, user: { ...m.user, ...u } } : m);
+        qc.setQueriesData<Message[]>({ queryKey: ["messages"] }, (old) => old?.map(patch));
+        qc.setQueriesData<Message[]>({ queryKey: ["pins"] }, (old) => old?.map(patch));
+        qc.setQueriesData<{ parent: Message; replies: Message[] }>({ queryKey: ["thread"] }, (old) =>
+          old ? { parent: patch(old.parent), replies: old.replies.map(patch) } : old,
+        );
+      });
+
       s.on(SocketEvents.NotificationNew, (n: AppNotification) => {
         qc.setQueryData<AppNotification[]>(["notifications"], (old) =>
           old ? [n, ...old] : [n],
@@ -185,15 +221,14 @@ export function SocketProvider({
         qc.setQueryData(["settings"], p.settings);
         applyFromSettings(p.settings);
       });
-    })();
 
-    const interval = setInterval(() => uiRef.current.pruneTyping(), 1500);
+      const interval = setInterval(() => uiRef.current.pruneTyping(), 1500);
 
-    return () => {
-      active = false;
-      clearInterval(interval);
-      s?.disconnect();
-    };
+      return () => {
+        clearInterval(interval);
+        s.disconnect();
+      };
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id]);
 

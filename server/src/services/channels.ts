@@ -75,6 +75,7 @@ export function listChannelsForUser(userId: number): Channel[] {
         ucl.user_id AS has_override,
         ucl.category_id AS ovr_category,
         ucl.position AS ovr_position,
+        (SELECT 1 FROM user_channel_favorites f WHERE f.channel_id = c.id AND f.user_id = @uid) AS is_fav,
         (SELECT COUNT(*) FROM messages m
            WHERE m.channel_id = c.id
              AND m.parent_id IS NULL
@@ -101,7 +102,8 @@ export function listChannelsForUser(userId: number): Channel[] {
     topic: r.topic,
     icon: r.icon,
     isPrivate: !!r.is_private,
-    isPromoted: !!r.is_promoted,
+    isPromoted: !!r.is_fav, // promoted/favorited is now per-user
+
     // personal layout override takes precedence over the admin default
     categoryId: r.has_override !== null ? r.ovr_category : r.category_id,
     position: r.has_override !== null ? r.ovr_position : r.position,

@@ -3,10 +3,9 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { eq } from "drizzle-orm";
-import type { AppSettings } from "@slashslack/shared";
 import * as schema from "./schema.js";
 import { runMigrations } from "./migrate.js";
-import { DEFAULT_SETTINGS } from "../settings.js";
+import { DEFAULT_SETTINGS, type StoredSettings } from "../settings.js";
 
 export const DATA_DIR = process.env.DATA_DIR || "./data";
 export const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
@@ -64,7 +63,7 @@ export function seed() {
   }
 }
 
-export function getSettings(): AppSettings {
+export function getSettings(): StoredSettings {
   const row = db
     .select()
     .from(schema.appSettings)
@@ -74,7 +73,7 @@ export function getSettings(): AppSettings {
   return { ...DEFAULT_SETTINGS, ...JSON.parse(row.data) };
 }
 
-export function saveSettings(next: AppSettings) {
+export function saveSettings(next: StoredSettings) {
   db.update(schema.appSettings)
     .set({ data: JSON.stringify(next) })
     .where(eq(schema.appSettings.id, 1))

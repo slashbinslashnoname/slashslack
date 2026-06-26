@@ -88,7 +88,7 @@ export function Sidebar({
 
   const logout = async () => {
     await api.post("/api/auth/logout");
-    location.reload();
+    location.href = "/"; // reset URL to the homepage on disconnect
   };
 
   return (
@@ -245,11 +245,16 @@ export function Sidebar({
       <div className="border-t border-white/10 p-2 flex items-center gap-1">
         <button
           onClick={onOpenProfile}
-          className="flex items-center gap-2.5 min-w-0 flex-1 hover:bg-white/5 rounded-md px-2 h-10"
+          className="flex items-center gap-2.5 min-w-0 flex-1 hover:bg-white/5 rounded-md px-2 h-10 text-left"
           title="Edit your profile"
         >
           <Avatar user={me} size={28} />
-          <span className="text-sm text-white truncate">{me.displayName}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm text-white truncate leading-tight">{me.displayName}</span>
+            {me.statusText && (
+              <span className="block text-[11px] text-sidebar-fg/70 truncate leading-tight">{me.statusText}</span>
+            )}
+          </span>
         </button>
         <button onClick={cycleTheme} title="Switch theme" className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white/10 hover:text-white">
           <SunMoon size={16} />

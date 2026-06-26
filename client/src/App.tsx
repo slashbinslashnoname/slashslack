@@ -17,6 +17,13 @@ export default function App() {
     if (settings) applyFromSettings(settings);
   }, [settings]);
 
+  // when logged out, keep the homepage URL at "/" (preserve ?invite=)
+  useEffect(() => {
+    if (!me.isLoading && !me.data && window.location.pathname !== "/") {
+      window.history.replaceState(null, "", "/" + window.location.search);
+    }
+  }, [me.isLoading, me.data]);
+
   if (me.isLoading) {
     return <div className="h-full flex items-center justify-center text-muted">Loading…</div>;
   }
@@ -34,6 +41,10 @@ export default function App() {
     <SocketProvider user={me.data}>
       <Routes>
         <Route path="/" element={<Chat me={me.data} />} />
+        <Route path="/c/:channelId" element={<Chat me={me.data} />} />
+        <Route path="/c/:channelId/:messageId" element={<Chat me={me.data} />} />
+        <Route path="/dm/:dmId" element={<Chat me={me.data} />} />
+        <Route path="/dm/:dmId/:messageId" element={<Chat me={me.data} />} />
         <Route
           path="/admin"
           element={me.data.role === "admin" ? <Admin me={me.data} /> : <Navigate to="/" />}

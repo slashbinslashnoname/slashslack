@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { and, desc, eq, isNull, lt } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, lt, lte } from "drizzle-orm";
 import {
   SocketEvents,
   createMessageSchema,
@@ -32,13 +32,35 @@ function canSeeDm(dmId: number, userId: number) {
     .get();
 }
 
+/** Return a window of messages centered on `around` (for permalinks). */
+function windowAround(col: any, scopeId: number, around: number) {
+  const HALF = 25;
+  const older = db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(and(eq(col, scopeId), isNull(messages.parentId), lte(messages.id, around)))
+    .orderBy(desc(messages.id))
+    .limit(HALF)
+    .all();
+  const newer = db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(and(eq(col, scopeId), isNull(messages.parentId), gt(messages.id, around)))
+    .orderBy(messages.id)
+    .limit(HALF)
+    .all();
+  const ids = [...older.map((r) => r.id).reverse(), ...newer.map((r) => r.id)];
+  return { messages: loadMessages(ids), hasMore: older.length === HALF };
+}
+
 export async function messageRoutes(app: FastifyInstance) {
   // list top-level messages of a channel (newest-first window, returned ascending)
   app.get("/api/channels/:id/messages", { preHandler: requireAuth }, async (req, reply) => {
     const id = Number((req.params as any).id);
     const user = currentUser(req);
     if (!canSeeChannel(id, user.id)) return reply.code(403).send({ error: "No access" });
-    const { before, limit } = req.query as { before?: string; limit?: string };
+    const { before, around, limit } = req.query as { before?: string; around?: string; limit?: string };
+    if (around) return reply.send(windowAround(messages.channelId, id, Number(around)));
     const lim = Math.min(Number(limit) || 50, 100);
     const rows = db
       .select({ id: messages.id })
@@ -61,7 +83,8 @@ export async function messageRoutes(app: FastifyInstance) {
     const id = Number((req.params as any).id);
     const user = currentUser(req);
     if (!canSeeDm(id, user.id)) return reply.code(403).send({ error: "No access" });
-    const { before, limit } = req.query as { before?: string; limit?: string };
+    const { before, around, limit } = req.query as { before?: string; around?: string; limit?: string };
+    if (around) return reply.send(windowAround(messages.dmId, id, Number(around)));
     const lim = Math.min(Number(limit) || 50, 100);
     const rows = db
       .select({ id: messages.id })

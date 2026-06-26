@@ -13,6 +13,7 @@ export const users = sqliteTable("users", {
   displayName: text("display_name").notNull(),
   avatarUrl: text("avatar_url"),
   role: text("role").notNull().default("member"),
+  statusText: text("status_text"),
   createdAt: text("created_at")
     .notNull()
     .default(sql`(datetime('now'))`),
@@ -153,6 +154,17 @@ export const notifications = sqliteTable("notifications", {
 export const appSettings = sqliteTable("app_settings", {
   id: integer("id").primaryKey(),
   data: text("data").notNull(),
+});
+
+export const channelWebhooks = sqliteTable("channel_webhooks", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  channelId: integer("channel_id").notNull(),
+  token: text("token").notNull().unique(),
+  name: text("name").notNull().default("Webhook"),
+  createdBy: integer("created_by").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
 });
 
 export const invites = sqliteTable("invites", {

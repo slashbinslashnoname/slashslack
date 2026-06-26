@@ -40,6 +40,7 @@ export interface PublicUser {
   avatarUrl: string | null;
   role: UserRole;
   status: PresenceStatus;
+  statusText: string | null;
 }
 
 /* --------------------------- Channels ---------------------------- */
@@ -248,6 +249,7 @@ export const SocketEvents = {
   SettingsUpdated: "settings:updated",
   MessagePinned: "message:pinned",
   ReceiptUpdate: "receipt:update",
+  UserUpdated: "user:updated",
   // client -> server
   Subscribe: "subscribe",
   TypingStart: "typing:start",

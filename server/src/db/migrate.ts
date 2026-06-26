@@ -149,6 +149,16 @@ export function runMigrations(db: Database.Database) {
       PRIMARY KEY (user_id, channel_id)
     );
 
+    -- secure incoming webhooks for posting to a channel programmatically
+    CREATE TABLE IF NOT EXISTS channel_webhooks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      channel_id INTEGER NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL DEFAULT 'Webhook',
+      created_by INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     -- Full text search over message bodies
     CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
       body,
@@ -171,6 +181,15 @@ export function runMigrations(db: Database.Database) {
   // additive columns (SQLite has no ADD COLUMN IF NOT EXISTS)
   addColumn(db, "messages", "pinned_at", "TEXT");
   addColumn(db, "messages", "pinned_by", "INTEGER");
+  addColumn(db, "users", "status_text", "TEXT");
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_channel_favorites (
+      user_id INTEGER NOT NULL,
+      channel_id INTEGER NOT NULL,
+      PRIMARY KEY (user_id, channel_id)
+    );
+  `);
 }
 
 function addColumn(db: Database.Database, table: string, column: string, ddl: string) {

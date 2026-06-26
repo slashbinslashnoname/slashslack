@@ -8,13 +8,13 @@ export function MessageListModal({
   messages,
   emptyText,
   onClose,
-  onJump,
+  onSelect,
 }: {
   title: string;
   messages: Message[];
   emptyText: string;
   onClose: () => void;
-  onJump: (scope: string) => void;
+  onSelect: (m: Message) => void;
 }) {
   return (
     <Modal title={title} onClose={onClose} wide>
@@ -24,7 +24,7 @@ export function MessageListModal({
           <button
             key={m.id}
             onClick={() => {
-              onJump(m.channelId ? `channel:${m.channelId}` : `dm:${m.dmId}`);
+              onSelect(m);
               onClose();
             }}
             className="flex gap-3 text-left p-2 rounded-theme hover:bg-sidebar-active/10"
