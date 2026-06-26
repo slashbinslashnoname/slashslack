@@ -75,6 +75,13 @@ export function initRealtime(server: HttpServer) {
       socket.to(room).emit(SocketEvents.Typing, payload);
     });
 
+    socket.on(SocketEvents.PresenceSet, (p: { status?: "online" | "away" }) => {
+      const status = p?.status === "away" ? "away" : "online";
+      presence.setStatus(userId, status);
+      const u = getUserById(userId);
+      if (u) io.emit(SocketEvents.PresenceUpdate, toPublicUser(u));
+    });
+
     socket.on("disconnect", () => {
       const wentOffline = presence.disconnect(userId);
       if (wentOffline) {

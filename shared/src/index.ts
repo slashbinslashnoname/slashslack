@@ -255,6 +255,7 @@ export const SocketEvents = {
   Subscribe: "subscribe",
   TypingStart: "typing:start",
   ReadChannel: "read",
+  PresenceSet: "presence:set",
 } as const;
 
 export interface ReadReceipt {

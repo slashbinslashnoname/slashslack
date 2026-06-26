@@ -4,7 +4,9 @@ import { colorFor, initials } from "../lib/util";
 
 export function Avatar({ user, size = 36 }: { user: PublicUser; size?: number }) {
   const presence = useUi((s) => s.presence[user.id]);
-  const online = presence ? presence === "online" : user.status === "online";
+  const status = presence ?? user.status; // "online" | "away" | "offline"
+  const dotColor =
+    status === "online" ? "var(--success)" : status === "away" ? "#e0a82e" : "var(--fg-muted)";
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       {user.avatarUrl ? (
@@ -26,7 +28,7 @@ export function Avatar({ user, size = 36 }: { user: PublicUser; size?: number })
         style={{
           width: size * 0.32,
           height: size * 0.32,
-          background: online ? "var(--success)" : "var(--fg-muted)",
+          background: dotColor,
           borderColor: "var(--bg)",
         }}
       />

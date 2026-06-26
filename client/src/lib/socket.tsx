@@ -275,5 +275,40 @@ export function SocketProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id]);
 
+  // Activity-driven presence: report online/away based on activity + tab
+  // visibility, unless the user set a manual override.
+  const myPresence = useUi((st) => st.myPresence);
+  useEffect(() => {
+    if (!socket) return;
+    const IDLE = 5 * 60 * 1000;
+    let lastActivity = Date.now();
+    let current: "online" | "away" | null = null;
+    const compute = (): "online" | "away" => {
+      if (myPresence === "online") return "online";
+      if (myPresence === "away") return "away";
+      const active = document.visibilityState === "visible" && Date.now() - lastActivity < IDLE;
+      return active ? "online" : "away";
+    };
+    const emit = () => {
+      const eff = compute();
+      if (eff !== current) {
+        current = eff;
+        socket.emit(SocketEvents.PresenceSet, { status: eff });
+      }
+    };
+    const onActivity = () => {
+      lastActivity = Date.now();
+      emit();
+    };
+    const events = ["mousemove", "keydown", "mousedown", "touchstart", "visibilitychange"];
+    events.forEach((e) => window.addEventListener(e, onActivity, { passive: true } as any));
+    const tick = setInterval(emit, 30_000);
+    emit();
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, onActivity));
+      clearInterval(tick);
+    };
+  }, [socket, myPresence]);
+
   return <SocketContext.Provider value={socket}>{children}</SocketContext.Provider>;
 }

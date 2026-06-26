@@ -5,6 +5,7 @@ import { Upload, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { Modal } from "./Modal";
 import { Avatar } from "./Avatar";
+import { useUi } from "../store";
 
 export function ProfileModal({ me, onClose }: { me: PublicUser; onClose: () => void }) {
   const qc = useQueryClient();
@@ -12,6 +13,8 @@ export function ProfileModal({ me, onClose }: { me: PublicUser; onClose: () => v
   const [avatarUrl, setAvatarUrl] = useState<string | null>(me.avatarUrl);
   const [statusText, setStatusText] = useState(me.statusText ?? "");
   const [busy, setBusy] = useState(false);
+  const myPresence = useUi((s) => s.myPresence);
+  const setMyPresence = useUi((s) => s.setMyPresence);
 
   const preview: PublicUser = { ...me, displayName, avatarUrl };
 
@@ -67,6 +70,28 @@ export function ProfileModal({ me, onClose }: { me: PublicUser; onClose: () => v
         onChange={(e) => setDisplayName(e.target.value)}
         className="w-full border border-border rounded-theme px-3 py-2 mb-3 bg-elev"
       />
+
+      <label className="block text-sm font-medium mb-1">Availability</label>
+      <div className="flex gap-2 mb-1">
+        {([
+          { key: "auto", label: "Auto", color: "var(--success)" },
+          { key: "online", label: "Active", color: "var(--success)" },
+          { key: "away", label: "Away", color: "#e0a82e" },
+        ] as const).map((o) => (
+          <button
+            key={o.key}
+            onClick={() => setMyPresence(o.key)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-theme border text-sm"
+            style={{ borderColor: myPresence === o.key ? "var(--accent)" : "var(--border)" }}
+          >
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: o.color }} />
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-muted mb-3">
+        Auto sets you to Away after 5 minutes idle or when the tab is hidden.
+      </p>
 
       <label className="block text-sm font-medium mb-1">Status</label>
       <input

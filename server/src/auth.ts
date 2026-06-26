@@ -38,7 +38,7 @@ export function toPublicUser(u: {
     displayName: u.displayName,
     avatarUrl: u.avatarUrl,
     role: u.role as PublicUser["role"],
-    status: presence.isOnline(u.id) ? "online" : "offline",
+    status: presence.effectiveStatus(u.id),
     statusText: u.statusText ?? null,
   };
 }
