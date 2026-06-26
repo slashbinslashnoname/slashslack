@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.jpg" alt="SlashSlack — self-hosted realtime team chat" width="100%" />
+</p>
+
 # SlashSlack
 
 A self-hosted, realtime **Slack-like** team chat. React-first, SQLite-backed, single Docker
