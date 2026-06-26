@@ -1,0 +1,36 @@
+# Production deployment: pulls a pre-built image from GHCR instead of building.
+# Pick the version with IMAGE_TAG (default: latest). Examples:
+#   IMAGE_TAG=latest        docker compose -f docker-compose.prod.yml up -d
+#   IMAGE_TAG=v1.2.3        docker compose -f docker-compose.prod.yml up -d
+#   IMAGE_TAG=sha-1a2b3c4   docker compose -f docker-compose.prod.yml up -d
+services:
+  app:
+    image: ghcr.io/slashbinslashnoname/slashslack:${IMAGE_TAG:-latest}
+    container_name: slashslack
+    pull_policy: always
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      SESSION_SECRET: ${SESSION_SECRET:?set a long random secret in .env}
+      DATA_DIR: /app/data
+      UPLOAD_DIR: /app/uploads
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:3000}
+      # optional SMTP for email invites
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

@@ -48,6 +48,41 @@ docker compose up --build
 
 Open <http://localhost:3000>. Data persists in `./data` (SQLite) and `./uploads` (files).
 
+## Continuous deployment
+
+Two GitHub Actions run from `.github/workflows/`:
+
+- **CI** (`ci.yml`) — on every push/PR: `npm ci`, build all workspaces, run unit tests.
+- **Publish Docker image** (`docker-publish.yml`) — on push to `main` and on `v*` tags: builds a
+  multi-arch (amd64 + arm64) image and pushes it to **GHCR** as
+  `ghcr.io/slashbinslashnoname/slashslack`, tagged `latest`, `sha-<commit>`, and the semver on tags.
+
+No secrets needed — it uses the built-in `GITHUB_TOKEN`. After the first run, make the package
+public (repo → Packages → slashslack → Package settings → Visibility) or `docker login ghcr.io` on
+the server to pull privately.
+
+### Deploy a published version (pulls the right version from the repo)
+
+```bash
+cp .env.example .env                       # set SESSION_SECRET (and SMTP_* / PUBLIC_ORIGIN)
+IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
+```
+
+`docker-compose.prod.yml` pulls the image instead of building. Pin any version with `IMAGE_TAG`:
+
+```bash
+IMAGE_TAG=v1.2.3      docker compose -f docker-compose.prod.yml up -d   # a released tag
+IMAGE_TAG=sha-1a2b3c4 docker compose -f docker-compose.prod.yml up -d   # an exact commit
+```
+
+To cut a release image, push a tag: `git tag v1.0.0 && git push origin v1.0.0`.
+
+You can also build straight from the repo at a given ref, no clone needed:
+
+```bash
+docker build -t slashslack "https://github.com/slashbinslashnoname/slashslack.git#main"
+```
+
 ## Local development
 
 ```bash
