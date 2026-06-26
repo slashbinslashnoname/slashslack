@@ -1,0 +1,17 @@
+{
+  "name": "SlashSlack",
+  "short_name": "SlashSlack",
+  "description": "Self-hosted realtime team chat",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#3f0e40",
+  "theme_color": "#3f0e40",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

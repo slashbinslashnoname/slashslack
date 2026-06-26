@@ -1,0 +1,25 @@
+{
+  "name": "slashslack",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "npm run build -w shared && concurrently -n server,client -c blue,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm run dev -w server",
+    "dev:client": "npm run dev -w client",
+    "build": "npm run build -w shared && npm run build -w client && npm run build -w server",
+    "start": "node server/dist/index.js",
+    "migrate": "npm run migrate -w server",
+    "test": "npm run test -w server",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.2",
+    "concurrently": "^9.1.0"
+  }
+}
