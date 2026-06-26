@@ -18,16 +18,23 @@ import { ProfileModal } from "../components/ProfileModal";
 import { WebhookModal } from "../components/WebhookModal";
 import { Icon } from "../components/Icon";
 import { Avatar } from "../components/Avatar";
-import { useBookmarks, useChannels, useDms, usePins, useSettings } from "../lib/queries";
+import { useBookmarks, useChannels, useDms, useNotifications, usePins, useSettings } from "../lib/queries";
 import { api } from "../lib/api";
 
 export function Chat({ me }: { me: PublicUser }) {
   const { data: channels = [] } = useChannels();
   const { data: dms = [] } = useDms();
   const { data: settings } = useSettings();
+  const { data: notifications = [] } = useNotifications();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const params = useParams();
+
+  // unread signal for the tab title (notifications + unread channel/DM badges)
+  const unreadCount =
+    notifications.filter((n) => !n.read).length +
+    channels.reduce((a, c) => a + (c.unread || 0), 0) +
+    dms.reduce((a, d) => a + (d.unread || 0), 0);
 
   // scope + focused message are driven by the URL (permalinks / deep links)
   const scope = params.channelId
@@ -82,8 +89,9 @@ export function Chat({ me }: { me: PublicUser }) {
         }
       }
     }
-    document.title = where ? `${where} · ${appName}` : appName;
-  }, [scope, channels, dms, settings?.appName, me.id]);
+    const base = where ? `${where} · ${appName}` : appName;
+    document.title = unreadCount > 0 ? `(${unreadCount}) Unread · ${base}` : base;
+  }, [scope, channels, dms, settings?.appName, me.id, unreadCount]);
 
   useEffect(() => {
     if (!scope) return;
