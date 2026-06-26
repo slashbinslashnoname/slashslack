@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { Message, PublicUser } from "@slashslack/shared";
+import type { AppNotification, Channel, DmConversation, Message, PublicUser } from "@slashslack/shared";
 import { MessageItem } from "./MessageItem";
 import { Avatar } from "./Avatar";
 import { useChannels, useDms, useMessages, useReceipts, useUsers } from "../lib/queries";
@@ -43,17 +43,68 @@ export function MessageList({
   }
   const boundary = boundaryRef.current[scope] ?? 0;
   const firstUnread = messages.find((m) => m.id > boundary && m.user.id !== me.id);
+  const unreadCount = messages.filter((m) => m.id > boundary && m.user.id !== me.id).length;
   const scrollRef = useRef<HTMLDivElement>(null);
   const qc = useQueryClient();
   const [hasMore, setHasMore] = useState(true);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const focusedRef = useRef<number | null>(null);
+  const atBottomRef = useRef(true);
+  const initialScrollRef = useRef<string | null>(null);
 
-  // jump to bottom on new messages / scope change, unless focusing a permalink
+  // Commit "read" only once the latest messages have actually been seen (reached
+  // the bottom). Self-guards: no-op unless there's something unread to clear.
+  const markRead = useCallback(() => {
+    const [k, idS] = scope.split(":");
+    const sid = Number(idS);
+    const chans = qc.getQueryData<Channel[]>(["channels"]) || [];
+    const dmz = qc.getQueryData<DmConversation[]>(["dms"]) || [];
+    const notifs = qc.getQueryData<AppNotification[]>(["notifications"]) || [];
+    const unread =
+      k === "channel" ? chans.find((c) => c.id === sid)?.unread || 0 : dmz.find((d) => d.id === sid)?.unread || 0;
+    const hasNotif = notifs.some((n) => !n.read && (k === "channel" ? n.channelId === sid : n.dmId === sid));
+    if (!unread && !hasNotif) return;
+    const url = k === "channel" ? `/api/channels/${sid}/read` : `/api/dms/${sid}/read`;
+    const notifBody = k === "channel" ? { channelId: sid } : { dmId: sid };
+    Promise.all([api.post(url), api.post("/api/notifications/read", notifBody)]).then(() => {
+      qc.invalidateQueries({ queryKey: ["channels"] });
+      qc.invalidateQueries({ queryKey: ["dms"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    });
+  }, [scope, qc]);
+
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+    atBottomRef.current = atBottom;
+    if (atBottom) markRead();
+  };
+
+  // On opening a scope: land on the "New messages" line if there are unread,
+  // otherwise jump to the bottom (and mark read). New messages only auto-follow
+  // when already at the bottom, so reading the backlog isn't interrupted.
   useEffect(() => {
-    if (!loadingOlder && !focusMessageId) bottomRef.current?.scrollIntoView({ behavior: "auto" });
-  }, [messages.length, scope, focusMessageId]);
+    if (focusMessageId || loadingOlder || !messages.length) return;
+    if (liveLastRead === undefined) return; // wait until the read boundary is known
+    if (initialScrollRef.current !== scope) {
+      initialScrollRef.current = scope;
+      atBottomRef.current = !firstUnread;
+      requestAnimationFrame(() => {
+        if (firstUnread) {
+          document.getElementById("unread-anchor")?.scrollIntoView({ block: "center" });
+        } else {
+          bottomRef.current?.scrollIntoView({ behavior: "auto" });
+          markRead();
+        }
+      });
+    } else if (atBottomRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "auto" });
+      markRead();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length, scope, focusMessageId, liveLastRead]);
 
   // permalink focus: ensure the target is loaded, scroll to it, and flash it
   useEffect(() => {
@@ -118,7 +169,7 @@ export function MessageList({
     return <div className="flex-1 flex items-center justify-center text-muted">Loading…</div>;
 
   return (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto scroll-thin py-3">
+    <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto scroll-thin py-3">
       {messages.length > 0 && hasMore && (
         <div className="flex justify-center py-2">
           <button
@@ -146,9 +197,12 @@ export function MessageList({
         return (
           <div key={m.id}>
             {firstUnread?.id === m.id && (
-              <div className="flex items-center gap-2 px-4 my-2">
+              <div id="unread-anchor" className="flex items-center gap-2 px-4 my-2">
                 <div className="flex-1 h-px bg-danger" />
-                <span className="text-xs font-semibold text-danger">New messages</span>
+                <span className="text-xs font-semibold text-danger whitespace-nowrap">
+                  {unreadCount} new message{unreadCount === 1 ? "" : "s"} — you left off here
+                </span>
+                <div className="flex-1 h-px bg-danger" />
               </div>
             )}
             {showDay && (
