@@ -20,17 +20,16 @@ export async function notificationRoutes(app: FastifyInstance) {
 
   app.post("/api/notifications/read", { preHandler: requireAuth }, async (req) => {
     const user = currentUser(req);
-    const { id } = (req.body as { id?: number }) || {};
+    const { id, channelId, dmId } = (req.body as { id?: number; channelId?: number; dmId?: number }) || {};
+    const own = eq(notifications.userId, user.id);
     if (id) {
-      db.update(notifications)
-        .set({ read: true })
-        .where(and(eq(notifications.id, id), eq(notifications.userId, user.id)))
-        .run();
+      db.update(notifications).set({ read: true }).where(and(own, eq(notifications.id, id))).run();
+    } else if (channelId) {
+      db.update(notifications).set({ read: true }).where(and(own, eq(notifications.channelId, channelId))).run();
+    } else if (dmId) {
+      db.update(notifications).set({ read: true }).where(and(own, eq(notifications.dmId, dmId))).run();
     } else {
-      db.update(notifications)
-        .set({ read: true })
-        .where(eq(notifications.userId, user.id))
-        .run();
+      db.update(notifications).set({ read: true }).where(own).run();
     }
     return { ok: true };
   });

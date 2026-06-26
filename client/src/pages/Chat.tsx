@@ -97,9 +97,11 @@ export function Chat({ me }: { me: PublicUser }) {
     if (!scope) return;
     const [kind, id] = scope.split(":");
     const url = kind === "channel" ? `/api/channels/${id}/read` : `/api/dms/${id}/read`;
-    api.post(url).then(() => {
+    const notifBody = kind === "channel" ? { channelId: Number(id) } : { dmId: Number(id) };
+    Promise.all([api.post(url), api.post("/api/notifications/read", notifBody)]).then(() => {
       qc.invalidateQueries({ queryKey: ["channels"] });
       qc.invalidateQueries({ queryKey: ["dms"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
     });
     setThread(null);
   }, [scope]);
