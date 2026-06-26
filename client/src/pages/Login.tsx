@@ -80,34 +80,31 @@ export function Login() {
         />
       )}
 
-      {/* Hero / CTA */}
+      {/* Hero / CTA — same card style as the login box */}
       {!showForm ? (
-        <div className="relative z-10 text-center text-white px-6 max-w-2xl">
-          <div className="flex items-center justify-center gap-3 mb-6">
+        <div className="relative z-10 w-full max-w-sm mx-4 bg-bg border border-border rounded-2xl shadow-2xl p-8 text-center animate-[fadeIn_.3s_ease]">
+          <div className="flex items-center justify-center gap-2.5 mb-5">
             {settings?.logoUrl ? (
-              <img src={settings.logoUrl} className="w-12 h-12 rounded-xl object-cover" />
+              <img src={settings.logoUrl} className="w-10 h-10 rounded-lg object-cover" />
             ) : (
-              <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center text-accent-fg font-bold text-2xl">
+              <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center text-accent-fg font-bold text-xl">
                 {appName[0]}
               </div>
             )}
-            <span className="text-2xl font-bold">{appName}</span>
+            <span className="text-xl font-bold">{appName}</span>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4">
+          <h1 className="text-2xl font-extrabold tracking-tight mb-3">
             Where your team comes together.
           </h1>
-          <p className="text-lg text-white/80 mb-8">
-            Realtime channels, threads, and DMs — self-hosted and yours. Sleek, fast, and built for focus.
+          <p className="text-muted mb-6">
+            Realtime channels, threads, and DMs — self-hosted and yours. Sleek, fast, built for focus.
           </p>
           <button
             onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-2 bg-accent text-accent-fg px-6 py-3 rounded-full font-semibold text-lg hover:opacity-90 transition"
+            className="inline-flex items-center gap-2 bg-accent text-accent-fg px-6 py-3 rounded-full font-semibold hover:opacity-90 transition"
           >
             Get started <ArrowRight size={20} />
           </button>
-          <div className="absolute bottom-[-3.5rem] inset-x-0 text-center text-xs text-white/50">
-            📡 The International Space Station, from the SpaceX Crew Dragon
-          </div>
         </div>
       ) : (
         <div className="relative z-10 w-full max-w-sm mx-4 bg-bg border border-border rounded-2xl shadow-2xl p-8 animate-[fadeIn_.3s_ease]">
@@ -193,6 +190,10 @@ export function Login() {
           )}
         </div>
       )}
+
+      <div className="absolute bottom-3 inset-x-0 text-center text-[11px] text-white/40 z-10 px-4">
+        📡 The International Space Station, from the SpaceX Crew Dragon
+      </div>
     </div>
   );
 }
