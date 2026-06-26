@@ -4,8 +4,8 @@
   "description": "Self-hosted realtime team chat",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#3f0e40",
-  "theme_color": "#3f0e40",
+  "background_color": "#4a154b",
+  "theme_color": "#4a154b",
   "icons": [
     {
       "src": "/favicon.svg",

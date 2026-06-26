@@ -17,17 +17,17 @@ export type StoredSettings = AppSettings & { smtp?: SmtpConfig };
  * Theme is fully token-driven: every color in the UI is a CSS variable.
  * Admin can override any token live. We ship a few presets.
  */
-// Simplified Slack palette: aubergine sidebar, soft tinted (non-white) backgrounds.
+// Violet Slack palette: aubergine sidebar, violet accent, soft tinted backgrounds.
 export const LIGHT_TOKENS: ThemeTokens = {
-  "--bg": "#f4f2f6",
+  "--bg": "#f5f3f8",
   "--bg-elev": "#ffffff",
-  "--sidebar": "#3f0e40",
-  "--sidebar-fg": "#d6c9d7",
-  "--sidebar-active": "#5c255e",
+  "--sidebar": "#4a154b",
+  "--sidebar-fg": "#d8c9da",
+  "--sidebar-active": "#611f69",
   "--fg": "#1d1c1d",
   "--fg-muted": "#696769",
-  "--border": "#e4dee6",
-  "--accent": "#1264a3",
+  "--border": "#e6dfe8",
+  "--accent": "#6d28d9",
   "--accent-fg": "#ffffff",
   "--danger": "#e01e5a",
   "--success": "#2bac76",

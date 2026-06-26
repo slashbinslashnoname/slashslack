@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import type { PublicUser } from "@slashslack/shared";
 import { ArrowRight, ArrowLeft } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { useSettings } from "../lib/queries";
 
+const HERO_IMAGE = "/iss.jpg";
+const hasInvite = () => new URLSearchParams(location.search).has("invite");
+
 export function Login() {
   const { data: settings } = useSettings();
   const qc = useQueryClient();
-  const [mode, setMode] = useState<"login" | "register">("login");
-  const [showForm, setShowForm] = useState(false);
+  const [mode, setMode] = useState<"login" | "register">(hasInvite() ? "register" : "login");
+  // invite links open straight to the acceptance box (skip the hero)
+  const [showForm, setShowForm] = useState(hasInvite());
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -17,12 +21,6 @@ export function Login() {
   const [busy, setBusy] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [invited, setInvited] = useState(false);
-
-  const { data: hero } = useQuery({
-    queryKey: ["hero-image"],
-    queryFn: () => api.get<{ imageUrl: string | null; title: string | null }>("/api/hero-image"),
-    staleTime: 6 * 60 * 60 * 1000,
-  });
 
   useEffect(() => {
     const token = new URLSearchParams(location.search).get("invite");
@@ -70,19 +68,17 @@ export function Login() {
       <div
         className="absolute inset-0 bg-center bg-cover transition-transform duration-700"
         style={{
-          backgroundImage: hero?.imageUrl
-            ? `url(${hero.imageUrl})`
-            : "linear-gradient(135deg, var(--sidebar), var(--accent))",
+          backgroundImage: `url(${HERO_IMAGE})`,
           transform: showForm ? "scale(1.05)" : "scale(1)",
         }}
       />
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(160deg, color-mix(in srgb, var(--sidebar) 80%, transparent), color-mix(in srgb, #000 75%, transparent))",
-        }}
-      />
+      {/* neutral darkening for text legibility — only on the hero, no color tint */}
+      {!showForm && (
+        <div
+          className="absolute inset-0"
+          style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0.5))" }}
+        />
+      )}
 
       {/* Hero / CTA */}
       {!showForm ? (
@@ -109,11 +105,9 @@ export function Login() {
           >
             Get started <ArrowRight size={20} />
           </button>
-          {hero?.title && (
-            <div className="absolute bottom-[-3.5rem] inset-x-0 text-center text-xs text-white/50">
-              📡 ISS · {hero.title}
-            </div>
-          )}
+          <div className="absolute bottom-[-3.5rem] inset-x-0 text-center text-xs text-white/50">
+            📡 The International Space Station, from the SpaceX Crew Dragon
+          </div>
         </div>
       ) : (
         <div className="relative z-10 w-full max-w-sm mx-4 bg-bg border border-border rounded-2xl shadow-2xl p-8 animate-[fadeIn_.3s_ease]">
