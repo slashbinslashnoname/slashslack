@@ -16,14 +16,22 @@ function curlSnippet(url: string) {
 }
 function llmSnippet(url: string, channel: string) {
   return [
-    `You can post messages to the "${channel}" channel by sending an HTTP POST request to:`,
+    `You can interact with the "${channel}" channel through this secret webhook URL:`,
     url,
     ``,
-    `JSON body: {"text": "your message"}  (optional: {"text": "...", "username": "Bot"}).`,
+    `SEND a message — POST with JSON body {"text": "your message"} (optional {"username": "Bot"}).`,
     `Markdown is supported. Example:`,
-    `curl -X POST ${url} -H "Content-Type: application/json" -d '{"text":"Hello!"}'`,
+    `  curl -X POST ${url} -H "Content-Type: application/json" -d '{"text":"Hello!"}'`,
     ``,
-    `Keep this URL secret — anyone with it can post to the channel.`,
+    `READ recent messages for context — GET ${url}/messages?limit=20`,
+    `  Returns { channel, messages: [{ id, author, body, createdAt }], nextBefore }.`,
+    `  Paginate to older messages with ?before=<nextBefore> (limit max 50).`,
+    ``,
+    `PRECAUTIONS:`,
+    `- Only READ when you genuinely need recent channel context to respond. Do not poll,`,
+    `  and do not fetch history on every turn — fetch only when there is a contextual need.`,
+    `- Keep limit small (start at 20); request more pages only if truly necessary.`,
+    `- This URL is a secret: anyone with it can read and post to the channel.`,
   ].join("\n");
 }
 

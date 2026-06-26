@@ -124,28 +124,16 @@ export function useSendMessage() {
     mutationFn: (input: CreateMessageInput) =>
       api.post<{ message: Message }>("/api/messages", input).then((r) => r.message),
     // Write the message into the cache immediately so it shows even if the
-    // websocket echo is delayed/disconnected. Idempotent with the socket handler.
+    // websocket echo is delayed/disconnected.
     onSuccess: (msg) => {
-      if (msg.parentId) {
-        qc.setQueryData<{ parent: Message; replies: Message[] }>(["thread", msg.parentId], (old) =>
-          old && !old.replies.some((r) => r.id === msg.id)
-            ? { ...old, replies: [...old.replies, msg] }
-            : old,
-        );
-        qc.setQueryData<Message[]>(["messages", messageScope(msg)], (old) =>
-          old?.map((m) =>
-            m.id === msg.parentId
-              ? { ...m, replyCount: m.replyCount + 1, lastReplyAt: msg.createdAt }
-              : m,
-          ),
-        );
-      } else {
-        qc.setQueryData<Message[]>(["messages", messageScope(msg)], (old) => {
-          if (!old) return old;
-          if (old.some((m) => m.id === msg.id)) return old.map((m) => (m.id === msg.id ? msg : m));
-          return [...old, msg];
-        });
-      }
+      // Thread replies are reconciled solely via the socket echo — incrementing
+      // replyCount here too would double-count for the sender.
+      if (msg.parentId) return;
+      qc.setQueryData<Message[]>(["messages", messageScope(msg)], (old) => {
+        if (!old) return old;
+        if (old.some((m) => m.id === msg.id)) return old.map((m) => (m.id === msg.id ? msg : m));
+        return [...old, msg];
+      });
     },
   });
 }

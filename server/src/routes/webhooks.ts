@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { nanoid } from "nanoid";
-import { db } from "../db/index.js";
+import { db, raw } from "../db/index.js";
 import { channels, channelWebhooks, users } from "../db/schema.js";
 import { currentUser, requireAuth } from "../auth.js";
 import { ensureMembership, isMember } from "../services/channels.js";
@@ -97,5 +97,39 @@ export async function webhookRoutes(app: FastifyInstance) {
     const body = parsed.data.username ? `**${parsed.data.username}:** ${parsed.data.text}` : parsed.data.text;
     const message = createMessageRecord({ userId: botId, channelId: wh.channelId, body });
     return { ok: true, messageId: message.id };
+  });
+
+  // Read recent messages from the webhook's channel (token-authenticated, paginated).
+  // Intended for an integration/LLM to gather context — use sparingly.
+  app.get("/api/webhooks/:token/messages", async (req, reply) => {
+    const token = (req.params as any).token as string;
+    const wh = db.select().from(channelWebhooks).where(eq(channelWebhooks.token, token)).get();
+    if (!wh) return reply.code(404).send({ error: "Invalid webhook token" });
+    const q = req.query as { before?: string; limit?: string };
+    const lim = Math.min(Math.max(Number(q.limit) || 20, 1), 50);
+    const before = q.before ? Number(q.before) : null;
+
+    const rows = raw
+      .prepare(
+        `SELECT m.id AS id, m.body AS body, m.created_at AS createdAt, u.display_name AS author
+         FROM messages m JOIN users u ON u.id = m.user_id
+         WHERE m.channel_id = @cid AND m.parent_id IS NULL AND m.deleted_at IS NULL
+           ${before ? "AND m.id < @before" : ""}
+         ORDER BY m.id DESC LIMIT @lim`,
+      )
+      .all({ cid: wh.channelId, lim, before }) as {
+      id: number;
+      body: string;
+      createdAt: string;
+      author: string;
+    }[];
+
+    const ch = db.select().from(channels).where(eq(channels.id, wh.channelId)).get();
+    const oldest = rows.length ? rows[rows.length - 1].id : null;
+    return {
+      channel: ch?.name ?? null,
+      messages: rows.reverse(), // oldest → newest for readability
+      nextBefore: rows.length === lim ? oldest : null, // pass as ?before= for the previous page
+    };
   });
 }
