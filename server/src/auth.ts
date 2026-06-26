@@ -15,8 +15,13 @@ declare module "@fastify/secure-session" {
 export function hashPassword(pw: string) {
   return argon2.hash(pw);
 }
-export function verifyPassword(hash: string, pw: string) {
-  return argon2.verify(hash, pw);
+export async function verifyPassword(hash: string, pw: string) {
+  try {
+    return await argon2.verify(hash, pw);
+  } catch {
+    // malformed/disabled hash (e.g. bot accounts) → never authenticate
+    return false;
+  }
 }
 
 export function toPublicUser(u: {

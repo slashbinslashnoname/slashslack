@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { Channel } from "@slashslack/shared";
 import { db, raw } from "../db/index.js";
-import { channelMembers, channels, messages, users } from "../db/schema.js";
+import { channelMembers, channels, dmMembers, messages, users } from "../db/schema.js";
 
 function maxMessageId(channelId: number): number {
   const row = db
@@ -50,6 +50,22 @@ export function addUserToAllPublicChannels(userId: number) {
     .where(eq(channels.isPrivate, false))
     .all();
   for (const c of pub) ensureMembership(c.id, userId);
+}
+
+/** Can a user view a channel? (public, or a member of a private one) */
+export function canSeeChannel(channelId: number, userId: number) {
+  const ch = db.select().from(channels).where(eq(channels.id, channelId)).get();
+  if (!ch) return false;
+  return !ch.isPrivate || isMember(channelId, userId);
+}
+
+/** Is a user a participant of a DM conversation? */
+export function canSeeDm(dmId: number, userId: number) {
+  return !!db
+    .select()
+    .from(dmMembers)
+    .where(and(eq(dmMembers.dmId, dmId), eq(dmMembers.userId, userId)))
+    .get();
 }
 
 export function isMember(channelId: number, userId: number) {

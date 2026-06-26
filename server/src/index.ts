@@ -5,7 +5,9 @@ import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import fastifyMultipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
+import helmet from "@fastify/helmet";
 import secureSession from "@fastify/secure-session";
+import crypto from "node:crypto";
 import { seed, UPLOAD_DIR } from "./db/index.js";
 import { initRealtime } from "./realtime/index.js";
 import { authRoutes } from "./routes/auth.js";
@@ -25,12 +27,21 @@ import { webhookRoutes } from "./routes/webhooks.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
 
+const IS_PROD = process.env.NODE_ENV === "production";
+const HTTPS_ORIGIN = (process.env.PUBLIC_ORIGIN || "").startsWith("https://");
+
 function sessionKey(): Buffer {
-  // 32-byte key derived from SESSION_SECRET (padded/truncated)
-  const secret = process.env.SESSION_SECRET || "dev-secret-change-me-please-32byte!!";
-  const buf = Buffer.alloc(32);
-  Buffer.from(secret).copy(buf);
-  return buf;
+  const secret = process.env.SESSION_SECRET;
+  // In production a strong, explicit secret is mandatory — never forge sessions
+  // with a known/default value.
+  if (IS_PROD && (!secret || secret.length < 32 || /change-?me/i.test(secret))) {
+    throw new Error(
+      "SESSION_SECRET must be set to a random 32+ character value in production (e.g. `openssl rand -hex 24`)",
+    );
+  }
+  // Derive a 32-byte key from the secret (or a dev-only random one).
+  const material = secret || crypto.randomBytes(32).toString("hex");
+  return crypto.createHash("sha256").update(material).digest();
 }
 
 async function main() {
@@ -38,10 +49,37 @@ async function main() {
 
   const app = Fastify({ logger: { level: process.env.LOG_LEVEL || "info" }, bodyLimit: 30 * 1024 * 1024 });
 
+  // security headers (CSP tuned for the SPA: external images/media allowed,
+  // no inline/external scripts, no framing)
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
+        mediaSrc: ["'self'", "data:", "blob:", "https:", "http:"],
+        connectSrc: ["'self'", "ws:", "wss:"],
+        fontSrc: ["'self'", "data:"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'self'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  });
+
   await app.register(secureSession, {
     key: sessionKey(),
     cookieName: "slashslack_session",
-    cookie: { path: "/", httpOnly: true, sameSite: "lax", maxAge: 60 * 60 * 24 * 30 },
+    cookie: {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: HTTPS_ORIGIN, // require HTTPS for the cookie when served over https
+      maxAge: 60 * 60 * 24 * 30,
+    },
   });
 
   await app.register(fastifyMultipart, {
@@ -57,11 +95,16 @@ async function main() {
     allowList: (req) => req.url === "/api/health",
   });
 
-  // serve uploaded files
+  // serve uploaded (user-controlled) files with locked-down headers
   await app.register(fastifyStatic, {
     root: path.resolve(UPLOAD_DIR),
     prefix: "/uploads/",
     decorateReply: false,
+    setHeaders: (res) => {
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      // a served upload may never execute scripts or be framed
+      res.setHeader("Content-Security-Policy", "default-src 'none'; img-src 'self'; media-src 'self'; sandbox");
+    },
   });
 
   app.get("/api/health", async () => ({ ok: true }));

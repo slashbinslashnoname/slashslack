@@ -194,6 +194,10 @@ export async function messageRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: "Invalid input" });
     const msg = db.select().from(messages).where(eq(messages.id, id)).get();
     if (!msg) return reply.code(404).send({ error: "Not found" });
+    if (msg.channelId && !canSeeChannel(msg.channelId, user.id))
+      return reply.code(403).send({ error: "No access" });
+    if (msg.dmId && !canSeeDm(msg.dmId, user.id))
+      return reply.code(403).send({ error: "No access" });
     const { emoji } = parsed.data;
     const existing = db
       .select()

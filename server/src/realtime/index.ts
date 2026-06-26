@@ -37,7 +37,13 @@ function roomsForUser(userId: number): string[] {
 }
 
 export function initRealtime(server: HttpServer) {
-  io = new Server(server, { cors: { origin: true, credentials: true } });
+  // Same-origin in production (single container). Reflect only in dev where the
+  // Vite dev server proxies the socket. The handshake is token-authenticated.
+  const corsOrigin =
+    process.env.NODE_ENV === "production"
+      ? process.env.PUBLIC_ORIGIN || false
+      : true;
+  io = new Server(server, { cors: { origin: corsOrigin, credentials: true } });
 
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token as string | undefined;

@@ -5,6 +5,7 @@ import { db } from "../db/index.js";
 import { linkPreviews, messages } from "../db/schema.js";
 import { emitToChannel, emitToDm } from "../realtime/index.js";
 import { extractUrls } from "../lib/text.js";
+import { isSafePublicUrl } from "../lib/ssrf.js";
 
 /**
  * Fetch Open Graph metadata for any URLs in a message, store the previews,
@@ -18,6 +19,8 @@ export async function unfurlMessage(messageId: number, body: string) {
   if (!msg) return;
 
   for (const url of urls) {
+    // SSRF guard: never fetch internal/loopback/metadata addresses
+    if (!(await isSafePublicUrl(url))) continue;
     try {
       const { result } = await ogs({
         url,

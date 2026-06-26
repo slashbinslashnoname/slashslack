@@ -66,7 +66,7 @@ export async function authRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: "Invalid input" });
     const { email, password } = parsed.data;
     const user = db.select().from(users).where(eq(users.email, email)).get();
-    if (!user || !(await verifyPassword(user.passwordHash, password)))
+    if (!user || user.isBot || !(await verifyPassword(user.passwordHash, password)))
       return reply.code(401).send({ error: "Invalid email or password" });
     req.session.set("userId", user.id);
     return { user: toPublicUser(user) };
