@@ -18,6 +18,13 @@ export async function notificationRoutes(app: FastifyInstance) {
     return { notifications: rows.map(serializeNotification) };
   });
 
+  // clear all notifications for the user
+  app.delete("/api/notifications", { preHandler: requireAuth }, async (req) => {
+    const user = currentUser(req);
+    db.delete(notifications).where(eq(notifications.userId, user.id)).run();
+    return { ok: true };
+  });
+
   app.post("/api/notifications/read", { preHandler: requireAuth }, async (req) => {
     const user = currentUser(req);
     const { id, channelId, dmId } = (req.body as { id?: number; channelId?: number; dmId?: number }) || {};

@@ -55,9 +55,10 @@ export function NotificationsPanel({
     g.items.push(n);
   }
 
+  // "Mark all read" clears the list entirely
   const markAll = async () => {
-    await api.post("/api/notifications/read", {});
-    qc.setQueryData<AppNotification[]>(["notifications"], (old) => old?.map((n) => ({ ...n, read: true })));
+    await api.del("/api/notifications");
+    qc.setQueryData<AppNotification[]>(["notifications"], []);
     qc.invalidateQueries({ queryKey: ["channels"] });
   };
 
