@@ -3,10 +3,27 @@ import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import { db } from "../db/index.js";
-import { channels, channelWebhooks } from "../db/schema.js";
+import { channels, channelWebhooks, users } from "../db/schema.js";
 import { currentUser, requireAuth } from "../auth.js";
-import { isMember } from "../services/channels.js";
+import { ensureMembership, isMember } from "../services/channels.js";
 import { createMessageRecord } from "../services/messages.js";
+
+/** Create a dedicated bot user so webhook messages count as "from someone else". */
+function createBotUser(token: string, name: string, channelId: number): number {
+  const bot = db
+    .insert(users)
+    .values({
+      email: `webhook-${token}@bots.local`,
+      passwordHash: "!login-disabled",
+      displayName: name,
+      role: "member",
+      isBot: true,
+    })
+    .returning()
+    .get();
+  ensureMembership(channelId, bot.id);
+  return bot.id;
+}
 
 function origin(req: FastifyRequest): string {
   if (process.env.PUBLIC_ORIGIN) return process.env.PUBLIC_ORIGIN;
@@ -42,9 +59,10 @@ export async function webhookRoutes(app: FastifyInstance) {
     const parsed = z.object({ name: z.string().min(1).max(60).optional() }).safeParse(req.body);
     const name = parsed.success && parsed.data.name ? parsed.data.name : "Webhook";
     const token = nanoid(40);
+    const botUserId = createBotUser(token, name, id);
     const row = db
       .insert(channelWebhooks)
-      .values({ channelId: id, token, name, createdBy: user.id })
+      .values({ channelId: id, token, name, createdBy: user.id, botUserId })
       .returning()
       .get();
     return { webhook: { id: row.id, name: row.name, url: hookUrl(req, token), createdAt: row.createdAt } };
@@ -70,8 +88,14 @@ export async function webhookRoutes(app: FastifyInstance) {
       .object({ text: z.string().min(1).max(8000), username: z.string().max(60).optional() })
       .safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "Body must be { text: string }" });
+    // post as the webhook's bot identity (lazily create for older webhooks)
+    let botId = wh.botUserId;
+    if (!botId) {
+      botId = createBotUser(wh.token, wh.name, wh.channelId);
+      db.update(channelWebhooks).set({ botUserId: botId }).where(eq(channelWebhooks.id, wh.id)).run();
+    }
     const body = parsed.data.username ? `**${parsed.data.username}:** ${parsed.data.text}` : parsed.data.text;
-    const message = createMessageRecord({ userId: wh.createdBy, channelId: wh.channelId, body });
+    const message = createMessageRecord({ userId: botId, channelId: wh.channelId, body });
     return { ok: true, messageId: message.id };
   });
 }

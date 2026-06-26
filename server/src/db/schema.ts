@@ -14,6 +14,7 @@ export const users = sqliteTable("users", {
   avatarUrl: text("avatar_url"),
   role: text("role").notNull().default("member"),
   statusText: text("status_text"),
+  isBot: integer("is_bot", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at")
     .notNull()
     .default(sql`(datetime('now'))`),
@@ -162,6 +163,7 @@ export const channelWebhooks = sqliteTable("channel_webhooks", {
   token: text("token").notNull().unique(),
   name: text("name").notNull().default("Webhook"),
   createdBy: integer("created_by").notNull(),
+  botUserId: integer("bot_user_id"),
   createdAt: text("created_at")
     .notNull()
     .default(sql`(datetime('now'))`),

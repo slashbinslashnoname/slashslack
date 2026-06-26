@@ -182,6 +182,8 @@ export function runMigrations(db: Database.Database) {
   addColumn(db, "messages", "pinned_at", "TEXT");
   addColumn(db, "messages", "pinned_by", "INTEGER");
   addColumn(db, "users", "status_text", "TEXT");
+  addColumn(db, "users", "is_bot", "INTEGER NOT NULL DEFAULT 0");
+  addColumn(db, "channel_webhooks", "bot_user_id", "INTEGER");
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS user_channel_favorites (

@@ -15,7 +15,12 @@ const updateMeSchema = z.object({
 
 export async function userRoutes(app: FastifyInstance) {
   app.get("/api/users", { preHandler: requireAuth }, async () => {
-    const rows = db.select().from(users).orderBy(asc(users.displayName)).all();
+    const rows = db
+      .select()
+      .from(users)
+      .where(eq(users.isBot, false))
+      .orderBy(asc(users.displayName))
+      .all();
     return { users: rows.map(toPublicUser) };
   });
 
