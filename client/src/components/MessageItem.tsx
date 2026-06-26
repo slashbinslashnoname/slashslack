@@ -46,7 +46,18 @@ export function MessageItem({
 
   if (message.deletedAt) {
     return (
-      <div className="px-4 py-1 text-sm text-muted italic">This message was deleted</div>
+      <div className="px-4 flex gap-3" style={{ paddingTop: compact ? 1 : 8, paddingBottom: 1 }}>
+        <div className="w-9 shrink-0">{!compact && <Avatar user={message.user} size={36} />}</div>
+        <div className="min-w-0 flex-1">
+          {!compact && (
+            <div className="flex items-baseline gap-2">
+              <span className="font-semibold text-muted">{message.user.displayName}</span>
+              <span className="text-xs text-muted">{formatTime(message.createdAt)}</span>
+            </div>
+          )}
+          <span className="text-sm text-muted italic">This message was deleted</span>
+        </div>
+      </div>
     );
   }
 

@@ -65,6 +65,8 @@ export function SocketProvider({
       });
 
       const upsertInList = (msg: Message) => {
+        // replies live in the thread cache only — never in the top-level channel list
+        if (msg.parentId) return;
         const key = ["messages", scopeKey(msg)];
         qc.setQueryData<Message[]>(key, (old) => {
           if (!old) return old;
@@ -119,20 +121,27 @@ export function SocketProvider({
           );
       });
 
-      s.on(SocketEvents.MessageDelete, (p: { id: number; channelId: number | null; dmId: number | null }) => {
-        const key = ["messages", scopeKey(p)];
-        qc.setQueryData<Message[]>(key, (old) =>
-          old?.map((m) =>
-            m.id === p.id ? { ...m, deletedAt: new Date().toISOString(), body: "" } : m,
-          ),
-        );
-        // drop it from the pinned list and any open thread
-        if (p.channelId)
-          qc.setQueryData<Message[]>(["pins", p.channelId], (old) => old?.filter((m) => m.id !== p.id));
-        qc.setQueriesData<{ parent: Message; replies: Message[] }>({ queryKey: ["thread"] }, (old) =>
-          old ? { ...old, replies: old.replies.filter((r) => r.id !== p.id) } : old,
-        );
-      });
+      s.on(
+        SocketEvents.MessageDelete,
+        (p: { id: number; channelId: number | null; dmId: number | null; parentId: number | null }) => {
+          const key = ["messages", scopeKey(p)];
+          qc.setQueryData<Message[]>(key, (old) =>
+            old?.map((m) => {
+              if (m.id === p.id) return { ...m, deletedAt: new Date().toISOString(), body: "" };
+              // a reply was deleted → decrement the parent's reply count
+              if (p.parentId && m.id === p.parentId)
+                return { ...m, replyCount: Math.max(0, m.replyCount - 1) };
+              return m;
+            }),
+          );
+          // drop it from the pinned list and any open thread
+          if (p.channelId)
+            qc.setQueryData<Message[]>(["pins", p.channelId], (old) => old?.filter((m) => m.id !== p.id));
+          qc.setQueriesData<{ parent: Message; replies: Message[] }>({ queryKey: ["thread"] }, (old) =>
+            old ? { ...old, replies: old.replies.filter((r) => r.id !== p.id) } : old,
+          );
+        },
+      );
 
       const onReaction = (p: { message: Message }) => {
         upsertInList(p.message);

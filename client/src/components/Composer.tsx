@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Attachment, PublicUser } from "@slashslack/shared";
 import { Paperclip, Send, SmilePlus, X } from "lucide-react";
 import { api } from "../lib/api";
@@ -7,7 +7,12 @@ import { useSocket } from "../lib/socket";
 import { SocketEvents } from "@slashslack/shared";
 import { EmojiPicker } from "./EmojiPicker";
 import { HoverMenu } from "./HoverMenu";
+import { MessageBody } from "./MessageBody";
 import { humanSize } from "../lib/util";
+
+const MAX_TEXTAREA_PX = 200;
+// rough detector for markdown syntax, used to show the live preview only when relevant
+const MARKDOWN_RE = /(\*\*|__|~~|`|^#{1,3}\s|^>\s|^[-*]\s|^\d+\.\s|\[[^\]]+\]\([^)]+\)|_[^_]+_|\*[^*]+\*)/m;
 
 interface Props {
   channelId?: number;
@@ -28,6 +33,16 @@ export function Composer({ channelId, dmId, parentId, placeholder }: Props) {
   const { data: users = [] } = useUsers();
   const send = useSendMessage();
   const socket = useSocket();
+
+  // auto-grow the textarea up to a max height, then scroll
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, MAX_TEXTAREA_PX) + "px";
+  }, [text]);
+
+  const showPreview = text.trim().length > 0 && MARKDOWN_RE.test(text);
 
   const emitTyping = () => {
     const now = Date.now();
@@ -182,6 +197,15 @@ export function Composer({ channelId, dmId, parentId, placeholder }: Props) {
           </div>
         )}
 
+        {showPreview && (
+          <div className="px-3 pt-2 border-b border-border">
+            <div className="text-[10px] uppercase tracking-wide text-muted mb-0.5">Preview</div>
+            <div className="text-sm pb-1.5">
+              <MessageBody body={text} users={users} />
+            </div>
+          </div>
+        )}
+
         <textarea
           ref={taRef}
           value={text}
@@ -198,7 +222,7 @@ export function Composer({ channelId, dmId, parentId, placeholder }: Props) {
           }}
           rows={1}
           placeholder={placeholder}
-          className="w-full resize-none bg-transparent px-3 py-2.5 outline-none max-h-40"
+          className="w-full resize-none bg-transparent px-3 py-2.5 outline-none overflow-y-auto scroll-thin"
         />
 
         <div className="flex items-center justify-between px-2 pb-1.5">

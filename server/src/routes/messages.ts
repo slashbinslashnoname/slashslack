@@ -180,7 +180,7 @@ export async function messageRoutes(app: FastifyInstance) {
       .set({ deletedAt: new Date().toISOString(), body: "" })
       .where(eq(messages.id, id))
       .run();
-    const payload = { id, channelId: msg.channelId, dmId: msg.dmId };
+    const payload = { id, channelId: msg.channelId, dmId: msg.dmId, parentId: msg.parentId };
     if (msg.channelId) emitToChannel(msg.channelId, SocketEvents.MessageDelete, payload);
     else if (msg.dmId) emitToDm(msg.dmId, SocketEvents.MessageDelete, payload);
     return { ok: true };
