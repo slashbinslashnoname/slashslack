@@ -16,6 +16,7 @@ import { NotificationsPanel } from "../components/NotificationsPanel";
 import { MessageListModal } from "../components/MessageListModal";
 import { ProfileModal } from "../components/ProfileModal";
 import { WebhookModal } from "../components/WebhookModal";
+import { ChannelHeader } from "../components/ChannelHeader";
 import { Icon } from "../components/Icon";
 import { Avatar } from "../components/Avatar";
 import { useBookmarks, useChannels, useDms, useNotifications, usePins, useSettings } from "../lib/queries";
@@ -113,18 +114,7 @@ export function Chat({ me }: { me: PublicUser }) {
     if (kind === "channel") {
       const c = channels.find((x) => x.id === id);
       if (!c) return null;
-      return (
-        <div className="flex items-center gap-2 min-w-0">
-          {c.isPrivate ? <Lock size={18} /> : <Icon name={c.icon} size={18} />}
-          <span className="font-bold truncate">{c.name}</span>
-          {c.topic && (
-            <>
-              <span className="text-border hidden sm:inline">|</span>
-              <span className="text-muted text-sm truncate hidden sm:inline">{c.topic}</span>
-            </>
-          )}
-        </div>
-      );
+      return <ChannelHeader channel={c} />;
     }
     const dm = dms.find((x) => x.id === id);
     if (!dm) return null;
