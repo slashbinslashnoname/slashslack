@@ -24,6 +24,13 @@ export default function App() {
     }
   }, [me.isLoading, me.data]);
 
+  // only ask for desktop-notification permission once the user is signed in
+  useEffect(() => {
+    if (me.data && "Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, [me.data]);
+
   if (me.isLoading) {
     return <div className="h-full flex items-center justify-center text-muted">Loading…</div>;
   }

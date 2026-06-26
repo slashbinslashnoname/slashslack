@@ -11,11 +11,6 @@ const queryClient = new QueryClient({
   },
 });
 
-// ask for browser notification permission (best-effort)
-if ("Notification" in window && Notification.permission === "default") {
-  Notification.requestPermission().catch(() => {});
-}
-
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
