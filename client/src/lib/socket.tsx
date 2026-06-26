@@ -49,6 +49,21 @@ export function SocketProvider({
       });
       setSocket(s);
 
+      // After a *re*connect, re-sync anything that changed while we were offline
+      // (unread counts, new messages, notifications) — events sent during the
+      // disconnect were missed.
+      let firstConnect = true;
+      s.on("connect", () => {
+        if (firstConnect) {
+          firstConnect = false;
+          return;
+        }
+        qc.invalidateQueries({ queryKey: ["channels"] });
+        qc.invalidateQueries({ queryKey: ["dms"] });
+        qc.invalidateQueries({ queryKey: ["notifications"] });
+        qc.invalidateQueries({ queryKey: ["messages"] });
+      });
+
       const upsertInList = (msg: Message) => {
         const key = ["messages", scopeKey(msg)];
         qc.setQueryData<Message[]>(key, (old) => {
